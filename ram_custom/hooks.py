@@ -43,7 +43,9 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Inter Company Transfer": "ram_custom/ram_custom/doctype/inter_company_transfer/inter_company_transfer.js"
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -144,6 +146,14 @@ app_license = "mit"
 # 		"on_trash": "method"
 # 	}
 # }
+doc_events = {
+	"Sales Invoice": {
+		"validate": "ram_custom.api.inter_company_transfer.block_inter_company_invoices",
+	},
+	"Purchase Invoice": {
+		"validate": "ram_custom.api.inter_company_transfer.block_inter_company_invoices",
+	},
+}
 
 # Scheduled Tasks
 # ---------------

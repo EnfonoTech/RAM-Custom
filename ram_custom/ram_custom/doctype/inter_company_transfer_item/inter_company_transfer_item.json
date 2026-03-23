@@ -1,0 +1,126 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-19 18:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "uom",
+  "stock_uom",
+  "conversion_factor",
+  "qty",
+  "source_warehouse",
+  "column_break_grwq",
+  "target_warehouse",
+  "cost_rate",
+  "transfer_rate",
+  "cost_value",
+  "transfer_value",
+  "markup_value"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "label": "Conversion Factor",
+   "reqd": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "label": "Target Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "cost_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Cost Rate",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "transfer_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Transfer Rate",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cost_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Cost Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transfer_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Transfer Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "markup_value",
+   "fieldtype": "Currency",
+   "label": "Markup Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_grwq",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-23 10:16:50.190777",
+ "modified_by": "Administrator",
+ "module": "Ram Custom",
+ "name": "Inter Company Transfer Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

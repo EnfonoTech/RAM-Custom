@@ -1,0 +1,91 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-20 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "from_company",
+  "to_company",
+  "cost_of_branch_sales_account",
+  "branch_sales_clearing_account",
+  "from_company_receivable_account",
+  "to_company_payable_account",
+  "unrealized_branch_margin_account"
+ ],
+ "fields": [
+  {
+   "fieldname": "from_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "From Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "To Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cost_of_branch_sales_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Cost of Branch Sales Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch_sales_clearing_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch Sales Clearing Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "from_company_receivable_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "From Company Receivable Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_company_payable_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "To Company Payable Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "unrealized_branch_margin_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Unrealized Branch Margin Account",
+   "options": "Account",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-20 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Ram Custom",
+ "name": "Inter Company Transfer Company Account",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
+

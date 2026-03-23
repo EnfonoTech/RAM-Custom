@@ -1,0 +1,294 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-03-19 17:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "column_break_gmkc",
+  "posting_date",
+  "column_break_zccc",
+  "posting_time",
+  "section_break_transfer",
+  "from_company",
+  "to_company",
+  "column_break_nsad",
+  "default_source_warehouse",
+  "default_target_warehouse",
+  "section_break_ejfr",
+  "items",
+  "section_break_totals",
+  "cost_value",
+  "column_break_paeg",
+  "transfer_value",
+  "column_break_vxhb",
+  "markup_value",
+  "section_break_accounts",
+  "cost_of_branch_sales_account",
+  "branch_sales_clearing_account",
+  "from_company_receivable_account",
+  "column_break_dync",
+  "to_company_payable_account",
+  "unrealized_branch_margin_account",
+  "section_break_links",
+  "issue_stock_entry",
+  "receipt_stock_entry",
+  "column_break_qgrb",
+  "receivable_journal_entry",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "default": "ICT-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "ICT-.YYYY.-.#####",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_transfer",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "from_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "From Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "To Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "default_source_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Source Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "default_target_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Target Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Inter Company Transfer Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "cost_value",
+   "fieldtype": "Currency",
+   "label": "Cost Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transfer_value",
+   "fieldtype": "Currency",
+   "label": "Transfer Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "markup_value",
+   "fieldtype": "Currency",
+   "label": "Markup Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_accounts",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "cost_of_branch_sales_account",
+   "fieldtype": "Link",
+   "label": "Cost of Branch Sales Account",
+   "options": "Account",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch_sales_clearing_account",
+   "fieldtype": "Link",
+   "label": "Branch Sales Clearing Account",
+   "options": "Account",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "from_company_receivable_account",
+   "fieldtype": "Link",
+   "label": "From Company Receivable Account",
+   "options": "Account",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_company_payable_account",
+   "fieldtype": "Link",
+   "label": "To Company Payable Account",
+   "options": "Account",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "unrealized_branch_margin_account",
+   "fieldtype": "Link",
+   "label": "Unrealized Branch Margin Account",
+   "options": "Account",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_links",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "issue_stock_entry",
+   "fieldtype": "Link",
+   "label": "Issue Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "receipt_stock_entry",
+   "fieldtype": "Link",
+   "label": "Receipt Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "receivable_journal_entry",
+   "fieldtype": "Link",
+   "label": "Receivable Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_gmkc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_nsad",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_ejfr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_vxhb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_dync",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_qgrb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Inter Company Transfer",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "posting_time",
+   "fieldtype": "Time",
+   "label": "Posting Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_zccc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_paeg",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-03-23 10:10:56.648737",
+ "modified_by": "Administrator",
+ "module": "Ram Custom",
+ "name": "Inter Company Transfer",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
