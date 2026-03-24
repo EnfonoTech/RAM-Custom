@@ -62,10 +62,41 @@ def _get_company_pair_account_row(from_company: str, to_company: str) -> dict:
 	return rows[0] if rows else {}
 
 
+def _get_remote_company_account_row(from_company: str, remote_company: str) -> dict:
+	if not from_company or not remote_company:
+		return {}
+	rows = frappe.get_all(
+		"Inter Company Transfer Remote Company Account",
+		filters={
+			"from_company": from_company,
+			"remote_company": remote_company,
+			"parenttype": "Inter Company Transfer Settings",
+		},
+		fields=[
+			"from_company",
+			"remote_company",
+			"cost_of_branch_sales_account",
+			"branch_sales_clearing_account",
+			"from_company_receivable_account",
+			"unrealized_branch_margin_account",
+		],
+		limit=1,
+	)
+	return rows[0] if rows else {}
+
+
 @frappe.whitelist()
-def get_transfer_account_heads(from_company: str, to_company: str) -> dict:
+def get_transfer_account_heads(
+	from_company: str,
+	to_company: str | None = None,
+	remote_company: str | None = None,
+	is_remote_transfer: int | str | None = 0,
+) -> dict:
 	"""Return configured account heads from settings for selected From/To pair."""
-	row = _get_company_pair_account_row(from_company, to_company)
+	if cint(is_remote_transfer):
+		row = _get_remote_company_account_row(from_company, remote_company)
+	else:
+		row = _get_company_pair_account_row(from_company, to_company)
 
 	return {
 		"cost_of_branch_sales_account": row.get("cost_of_branch_sales_account"),
@@ -176,7 +207,7 @@ def apply_default_transfer_rates_from_price_list(doc) -> None:
 			row.transfer_rate = pl_rate
 
 
-def _validate_accounts(from_company, to_company, data):
+def _validate_accounts(from_company, to_company, data, *, is_remote_transfer: bool = False):
 	for account in (
 		data.get("cost_of_branch_sales_account"),
 		data.get("branch_sales_clearing_account"),
@@ -189,13 +220,14 @@ def _validate_accounts(from_company, to_company, data):
 				_("Account {0} must belong to company {1}").format(account, from_company)
 			)
 
-	payable = data.get("to_company_payable_account")
-	if not payable:
-		frappe.throw(_("To company payable account must be set"))
-	if not _account_belongs_to_company(payable, to_company):
-		frappe.throw(
-			_("Account {0} must belong to company {1}").format(payable, to_company)
-		)
+	if not is_remote_transfer:
+		payable = data.get("to_company_payable_account")
+		if not payable:
+			frappe.throw(_("To company payable account must be set"))
+		if not _account_belongs_to_company(payable, to_company):
+			frappe.throw(
+				_("Account {0} must belong to company {1}").format(payable, to_company)
+			)
 
 	margin_acc = data.get("unrealized_branch_margin_account")
 	if margin_acc and not _account_belongs_to_company(margin_acc, from_company):
@@ -222,7 +254,7 @@ def _rollback_created_vouchers(created: list[tuple[str, str]]) -> None:
 			)
 
 
-def _normalize_items(data: dict) -> list[dict]:
+def _normalize_items(data: dict, *, is_remote_transfer: bool = False) -> list[dict]:
 	items = data.get("items") or []
 	default_source_warehouse = data.get("source_warehouse")
 	default_target_warehouse = data.get("target_warehouse")
@@ -265,8 +297,10 @@ def _normalize_items(data: dict) -> list[dict]:
 			)
 		if cost_rate < 0:
 			frappe.throw(_("Cost Rate cannot be negative for item {0}").format(item_code))
-		if not source_warehouse or not target_warehouse:
-			frappe.throw(_("Source/Target Warehouse is required for item {0}").format(item_code))
+		if not source_warehouse:
+			frappe.throw(_("Source Warehouse is required for item {0}").format(item_code))
+		if not is_remote_transfer and not target_warehouse:
+			frappe.throw(_("Target Warehouse is required for item {0}").format(item_code))
 		if conversion_factor <= 0:
 			frappe.throw(_("Conversion Factor must be greater than zero for item {0}").format(item_code))
 
@@ -317,20 +351,22 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 	"""
 	Automates inter-company transfer without Sales/Purchase Invoices:
 	1) Material Issue (From Company, at cost)
-	2) Material Receipt (To Company, at transfer rate)
+	2) Material Receipt (To Company, at transfer rate) [skipped when is_remote_transfer=1]
 	3) JE in From Company: Receivable Dr / Branch Sales Clearing Cr
 	"""
 	data = _parse_payload(payload)
+	is_remote_transfer = cint(data.get("is_remote_transfer"))
 	required = [
 		"transfer_id",
 		"from_company",
-		"to_company",
 		"cost_of_branch_sales_account",
 		"branch_sales_clearing_account",
 		"from_company_receivable_account",
-		"to_company_payable_account",
 		"unrealized_branch_margin_account",
 	]
+	if not is_remote_transfer:
+		required.append("to_company")
+		required.append("to_company_payable_account")
 	for key in required:
 		if not data.get(key):
 			frappe.throw(_("Missing required field: {0}").format(key))
@@ -338,11 +374,11 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 	transfer_id = str(data.get("transfer_id")).strip()
 	from_company = data.get("from_company")
 	to_company = data.get("to_company")
-	if from_company == to_company:
+	if to_company and from_company == to_company:
 		frappe.throw(_("From Company and To Company cannot be the same"))
 
-	_validate_accounts(from_company, to_company, data)
-	items = _normalize_items(data)
+	_validate_accounts(from_company, to_company, data, is_remote_transfer=bool(is_remote_transfer))
+	items = _normalize_items(data, is_remote_transfer=bool(is_remote_transfer))
 	total_cost_value, total_transfer_value = _apply_server_valuation_and_totals(items)
 	if flt(total_transfer_value) < flt(total_cost_value):
 		frappe.throw(
@@ -358,7 +394,7 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 					row["source_warehouse"], from_company
 				)
 			)
-		if not _warehouse_belongs_to_company(row["target_warehouse"], to_company):
+		if not is_remote_transfer and not _warehouse_belongs_to_company(row["target_warehouse"], to_company):
 			frappe.throw(
 				_("Target Warehouse {0} must belong to {1}").format(
 					row["target_warehouse"], to_company
@@ -371,7 +407,7 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 
 	if _is_duplicate("Stock Entry", "remarks", issue_marker):
 		frappe.throw(_("Transfer {0} already has an Issue Stock Entry").format(transfer_id))
-	if _is_duplicate("Stock Entry", "remarks", receipt_marker):
+	if not is_remote_transfer and _is_duplicate("Stock Entry", "remarks", receipt_marker):
 		frappe.throw(
 			_("Transfer {0} already has a Receipt Stock Entry").format(transfer_id)
 		)
@@ -405,28 +441,30 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 		issue.submit()
 		created.append(("Stock Entry", issue.name))
 
-		receipt = frappe.new_doc("Stock Entry")
-		receipt.stock_entry_type = "Material Receipt"
-		receipt.company = to_company
-		receipt.posting_date = posting_date
-		receipt.remarks = f"{receipt_marker} Inter-company receipt at transfer value"
-		for row in items:
-			receipt.append(
-				"items",
-				{
-					"item_code": row["item_code"],
-					"qty": row["qty"],
-					"uom": row.get("uom"),
-					"stock_uom": row.get("stock_uom"),
-					"conversion_factor": row.get("conversion_factor") or 1,
-					"t_warehouse": row["target_warehouse"],
-					"basic_rate": row["transfer_rate"],
-					"expense_account": data.get("to_company_payable_account"),
-				},
-			)
-		receipt.insert()
-		receipt.submit()
-		created.append(("Stock Entry", receipt.name))
+		receipt = None
+		if not is_remote_transfer:
+			receipt = frappe.new_doc("Stock Entry")
+			receipt.stock_entry_type = "Material Receipt"
+			receipt.company = to_company
+			receipt.posting_date = posting_date
+			receipt.remarks = f"{receipt_marker} Inter-company receipt at transfer value"
+			for row in items:
+				receipt.append(
+					"items",
+					{
+						"item_code": row["item_code"],
+						"qty": row["qty"],
+						"uom": row.get("uom"),
+						"stock_uom": row.get("stock_uom"),
+						"conversion_factor": row.get("conversion_factor") or 1,
+						"t_warehouse": row["target_warehouse"],
+						"basic_rate": row["transfer_rate"],
+						"expense_account": data.get("to_company_payable_account"),
+					},
+				)
+			receipt.insert()
+			receipt.submit()
+			created.append(("Stock Entry", receipt.name))
 
 		markup_value = flt(total_transfer_value - total_cost_value)
 
@@ -469,7 +507,7 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 		return {
 			"transfer_id": transfer_id,
 			"issue_stock_entry": issue.name,
-			"receipt_stock_entry": receipt.name,
+			"receipt_stock_entry": receipt.name if receipt else None,
 			"receivable_journal_entry": je.name,
 			"cost_value": total_cost_value,
 			"transfer_value": total_transfer_value,

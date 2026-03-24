@@ -5,7 +5,8 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "company_accounts"
+  "company_accounts",
+  "remote_company_accounts"
  ],
  "fields": [
   {
@@ -14,6 +15,12 @@
    "label": "From/To Company Account Mapping",
    "options": "Inter Company Transfer Company Account",
    "reqd": 1
+  },
+  {
+   "fieldname": "remote_company_accounts",
+   "fieldtype": "Table",
+   "label": "Remote Company Account Mapping",
+   "options": "Inter Company Transfer Remote Company Account"
   }
  ],
  "grid_page_length": 50,

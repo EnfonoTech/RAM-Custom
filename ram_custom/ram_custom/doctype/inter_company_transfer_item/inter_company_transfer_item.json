@@ -12,7 +12,7 @@
   "conversion_factor",
   "qty",
   "source_warehouse",
-  "column_break_grwq",
+  "column_break_ijaq",
   "target_warehouse",
   "cost_rate",
   "transfer_rate",
@@ -102,11 +102,12 @@
   {
    "fieldname": "markup_value",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Markup Value",
    "read_only": 1
   },
   {
-   "fieldname": "column_break_grwq",
+   "fieldname": "column_break_ijaq",
    "fieldtype": "Column Break"
   }
  ],
@@ -114,7 +115,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-24 12:46:03.088988",
+ "modified": "2026-03-24 16:03:35.590051",
  "modified_by": "Administrator",
  "module": "Ram Custom",
  "name": "Inter Company Transfer Item",

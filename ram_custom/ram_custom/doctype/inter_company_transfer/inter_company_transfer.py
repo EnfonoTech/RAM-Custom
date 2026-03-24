@@ -23,8 +23,14 @@ class InterCompanyTransfer(Document):
 
 		self._apply_account_heads_from_settings()
 		apply_default_transfer_rates_from_price_list(self)
-		if self.from_company and self.to_company and self.from_company == self.to_company:
-			frappe.throw(_("From Company and To Company cannot be the same"))
+		if self.is_remote_transfer:
+			if not self.remote_company:
+				frappe.throw(_("Remote Company is required for remote transfer"))
+		else:
+			if not self.to_company:
+				frappe.throw(_("To Company is required for local transfer"))
+			if self.from_company and self.to_company and self.from_company == self.to_company:
+				frappe.throw(_("From Company and To Company cannot be the same"))
 		if not self.items:
 			frappe.throw(_("Add at least one item row"))
 
@@ -39,10 +45,12 @@ class InterCompanyTransfer(Document):
 				frappe.throw(_("Transfer Rate must be greater than zero in all rows"))
 			if not row.source_warehouse:
 				row.source_warehouse = self.default_source_warehouse
-			if not row.target_warehouse:
+			if not self.is_remote_transfer and not row.target_warehouse:
 				row.target_warehouse = self.default_target_warehouse
-			if not row.source_warehouse or not row.target_warehouse:
-				frappe.throw(_("Source/Target Warehouse is required in each row"))
+			if not row.source_warehouse:
+				frappe.throw(_("Source Warehouse is required in each row"))
+			if not self.is_remote_transfer and not row.target_warehouse:
+				frappe.throw(_("Target Warehouse is required in each row"))
 			if flt(row.conversion_factor) <= 0:
 				frappe.throw(_("Conversion Factor must be greater than zero in all rows"))
 			row.cost_rate = get_item_valuation_rate(row.item_code, row.source_warehouse)
@@ -84,6 +92,7 @@ class InterCompanyTransfer(Document):
 				"posting_date": self.posting_date,
 				"from_company": self.from_company,
 				"to_company": self.to_company,
+				"remote_company": self.remote_company,
 				"source_warehouse": self.default_source_warehouse,
 				"target_warehouse": self.default_target_warehouse,
 				"cost_of_branch_sales_account": self.cost_of_branch_sales_account,
@@ -91,6 +100,7 @@ class InterCompanyTransfer(Document):
 				"from_company_receivable_account": self.from_company_receivable_account,
 				"to_company_payable_account": self.to_company_payable_account,
 				"unrealized_branch_margin_account": self.unrealized_branch_margin_account,
+				"is_remote_transfer": self.is_remote_transfer,
 				"items": [
 					{
 						"item_code": row.item_code,
@@ -113,9 +123,18 @@ class InterCompanyTransfer(Document):
 		self.db_set("transfer_id", self.name)
 
 	def _apply_account_heads_from_settings(self):
-		if not self.from_company or not self.to_company:
+		if not self.from_company:
 			return
-		heads = get_transfer_account_heads(self.from_company, self.to_company)
+		if self.is_remote_transfer and not self.remote_company:
+			return
+		if not self.is_remote_transfer and not self.to_company:
+			return
+		heads = get_transfer_account_heads(
+			from_company=self.from_company,
+			to_company=self.to_company,
+			remote_company=self.remote_company,
+			is_remote_transfer=self.is_remote_transfer,
+		)
 		if not any(heads.values()):
 			return
 		if heads.get("cost_of_branch_sales_account") and not self.cost_of_branch_sales_account:
