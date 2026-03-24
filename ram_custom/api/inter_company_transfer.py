@@ -4,7 +4,7 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate, nowdate
+from frappe.utils import cint, flt, getdate, nowdate
 
 TRANSFER_TAG = "ICT"
 
@@ -92,6 +92,88 @@ def _get_bin_valuation_rate(item_code: str, warehouse: str) -> float:
 def get_item_valuation_rate(item_code: str, warehouse: str) -> float:
 	"""Return valuation rate from Bin for item+warehouse (per stock UOM)."""
 	return _get_bin_valuation_rate(item_code, warehouse)
+
+
+def _get_ict_price_list_rate(
+	item_code: str,
+	price_list: str | None,
+	uom: str | None = None,
+	stock_uom: str | None = None,
+	conversion_factor: float | str | None = None,
+	transaction_date: str | None = None,
+) -> float:
+	"""Resolve rate in row UOM using ERPNext price list logic (same as sales transactions)."""
+	if not item_code or not price_list:
+		return 0.0
+	try:
+		from erpnext.stock.get_item_details import get_price_list_rate_for
+	except ImportError:
+		return 0.0
+	cf = flt(conversion_factor) or 1.0
+	u = uom or stock_uom
+	su = stock_uom or uom
+	if not u:
+		return 0.0
+	pl_row = frappe.db.get_value(
+		"Price List",
+		price_list,
+		["price_not_uom_dependent"],
+		as_dict=True,
+	)
+	price_list_uom_dependant = True
+	if pl_row is not None:
+		price_list_uom_dependant = not cint(pl_row.get("price_not_uom_dependent"))
+	args = frappe._dict(
+		price_list=price_list,
+		uom=u,
+		stock_uom=su or u,
+		conversion_factor=cf,
+		qty=1,
+		transaction_date=transaction_date or nowdate(),
+		price_list_uom_dependant=price_list_uom_dependant,
+		ignore_party=True,
+	)
+	rate = get_price_list_rate_for(args, item_code)
+	return flt(rate or 0)
+
+
+@frappe.whitelist()
+def get_inter_company_transfer_price_list_rate(
+	item_code: str,
+	price_list: str | None = None,
+	uom: str | None = None,
+	stock_uom: str | None = None,
+	conversion_factor: float | str | None = None,
+	transaction_date: str | None = None,
+) -> float:
+	"""Whitelisted: default transfer_rate from Item Price for the given price list."""
+	return _get_ict_price_list_rate(
+		item_code=item_code,
+		price_list=price_list,
+		uom=uom,
+		stock_uom=stock_uom,
+		conversion_factor=conversion_factor,
+		transaction_date=transaction_date,
+	)
+
+
+def apply_default_transfer_rates_from_price_list(doc) -> None:
+	"""Set row.transfer_rate from price list only when rate is not set (>0)."""
+	if not getattr(doc, "transfer_price_list", None):
+		return
+	for row in doc.items or []:
+		if not row.item_code or flt(row.transfer_rate) > 0:
+			continue
+		pl_rate = _get_ict_price_list_rate(
+			item_code=row.item_code,
+			price_list=doc.transfer_price_list,
+			uom=row.uom,
+			stock_uom=row.stock_uom,
+			conversion_factor=row.conversion_factor,
+			transaction_date=doc.posting_date,
+		)
+		if pl_rate > 0:
+			row.transfer_rate = pl_rate
 
 
 def _validate_accounts(from_company, to_company, data):

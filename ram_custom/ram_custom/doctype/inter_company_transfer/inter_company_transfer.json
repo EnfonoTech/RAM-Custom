@@ -9,19 +9,17 @@
   "naming_series",
   "column_break_gmkc",
   "posting_date",
-  "column_break_zccc",
-  "posting_time",
   "section_break_transfer",
   "from_company",
   "to_company",
   "column_break_nsad",
   "default_source_warehouse",
   "default_target_warehouse",
+  "transfer_price_list",
   "section_break_ejfr",
   "items",
   "section_break_totals",
   "cost_value",
-  "column_break_paeg",
   "transfer_value",
   "column_break_vxhb",
   "markup_value",
@@ -88,6 +86,12 @@
    "label": "Default Target Warehouse",
    "options": "Warehouse",
    "reqd": 1
+  },
+  {
+   "fieldname": "transfer_price_list",
+   "fieldtype": "Link",
+   "label": "Transfer Price List",
+   "options": "Price List"
   },
   {
    "fieldname": "items",
@@ -220,28 +224,13 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
-  },
-  {
-   "default": "Now",
-   "fieldname": "posting_time",
-   "fieldtype": "Time",
-   "label": "Posting Time",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_zccc",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_paeg",
-   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-23 10:10:56.648737",
+ "modified": "2026-03-24 12:17:52.544413",
  "modified_by": "Administrator",
  "module": "Ram Custom",
  "name": "Inter Company Transfer",

@@ -7,6 +7,7 @@ from frappe.model.document import Document
 from frappe.utils import flt
 
 from ram_custom.api.inter_company_transfer import (
+	apply_default_transfer_rates_from_price_list,
 	create_inter_company_transfer,
 	get_item_valuation_rate,
 	get_transfer_account_heads,
@@ -21,6 +22,7 @@ class InterCompanyTransfer(Document):
 			self.receivable_journal_entry = None
 
 		self._apply_account_heads_from_settings()
+		apply_default_transfer_rates_from_price_list(self)
 		if self.from_company and self.to_company and self.from_company == self.to_company:
 			frappe.throw(_("From Company and To Company cannot be the same"))
 		if not self.items:

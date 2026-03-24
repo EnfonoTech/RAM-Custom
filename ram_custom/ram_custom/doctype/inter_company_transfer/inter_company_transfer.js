@@ -74,6 +74,7 @@ function fetch_conversion_factor(frm, cdt, cdn, item_code, uom) {
 				);
 				recalculate_row_amounts(cdt, cdn);
 				recalculate_parent_totals(frm);
+				set_row_transfer_rate_from_price_list(frm, cdt, cdn);
 			}
 		},
 	});
@@ -92,6 +93,7 @@ async function on_item_row_item_code(frm, cdt, cdn) {
 		}
 	}
 	await set_row_cost_rate(frm, cdt, cdn);
+	await set_row_transfer_rate_from_price_list(frm, cdt, cdn);
 }
 
 async function set_row_cost_rate(frm, cdt, cdn) {
@@ -110,6 +112,39 @@ async function set_row_cost_rate(frm, cdt, cdn) {
 	recalculate_parent_totals(frm);
 }
 
+async function set_row_transfer_rate_from_price_list(frm, cdt, cdn) {
+	const row = locals[cdt][cdn];
+	if (!frm.doc.transfer_price_list || !row?.item_code || !row.uom) {
+		return;
+	}
+	const r = await frappe.call({
+		method: "ram_custom.api.inter_company_transfer.get_inter_company_transfer_price_list_rate",
+		args: {
+			item_code: row.item_code,
+			price_list: frm.doc.transfer_price_list,
+			uom: row.uom,
+			stock_uom: row.stock_uom,
+			conversion_factor: row.conversion_factor,
+			transaction_date: frm.doc.posting_date,
+		},
+	});
+	const rate = flt(r.message || 0);
+	if (rate > 0) {
+		frappe.model.set_value(cdt, cdn, "transfer_rate", rate);
+	}
+	recalculate_row_amounts(cdt, cdn);
+	recalculate_parent_totals(frm);
+}
+
+async function refresh_transfer_rates_from_price_list_all_rows(frm) {
+	if (!frm.doc.transfer_price_list) return;
+	for (const d of frm.doc.items || []) {
+		if (d.item_code && d.uom) {
+			await set_row_transfer_rate_from_price_list(frm, d.doctype, d.name);
+		}
+	}
+}
+
 frappe.ui.form.on("Inter Company Transfer", {
 	setup(frm) {
 		set_account_filters(frm);
@@ -118,6 +153,9 @@ frappe.ui.form.on("Inter Company Transfer", {
 		}));
 		frm.set_query("default_target_warehouse", () => ({
 			filters: { company: frm.doc.to_company },
+		}));
+		frm.set_query("transfer_price_list", () => ({
+			filters: { enabled: 1 },
 		}));
 		// When Stock Settings "allow_uom_with_conversion_rate_defined_in_item" is on,
 		// get_item_uom_query returns only UOMs from Item's UOM Conversion Detail; otherwise all enabled UOMs.
@@ -153,7 +191,14 @@ frappe.ui.form.on("Inter Company Transfer", {
 				frappe.model.set_value(d.doctype, d.name, "source_warehouse", frm.doc.default_source_warehouse);
 			}
 			await set_row_cost_rate(frm, d.doctype, d.name);
+			await set_row_transfer_rate_from_price_list(frm, d.doctype, d.name);
 		}
+	},
+	async posting_date(frm) {
+		await refresh_transfer_rates_from_price_list_all_rows(frm);
+	},
+	async transfer_price_list(frm) {
+		await refresh_transfer_rates_from_price_list_all_rows(frm);
 	},
 	default_target_warehouse(frm) {
 		(frm.doc.items || []).forEach((d) => {
@@ -188,11 +233,12 @@ frappe.ui.form.on("Inter Company Transfer Item", {
 			fetch_conversion_factor(frm, cdt, cdn, row.item_code, row.uom);
 		}
 	},
-	conversion_factor(frm, cdt, cdn) {
+	async conversion_factor(frm, cdt, cdn) {
 		recalculate_row_amounts(cdt, cdn);
 		recalculate_parent_totals(frm);
+		await set_row_transfer_rate_from_price_list(frm, cdt, cdn);
 	},
-	items_add(frm, cdt, cdn) {
+	async items_add(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
 		if (frm.doc.default_source_warehouse && !row.source_warehouse) {
 			frappe.model.set_value(cdt, cdn, "source_warehouse", frm.doc.default_source_warehouse);
@@ -202,10 +248,10 @@ frappe.ui.form.on("Inter Company Transfer Item", {
 		}
 		recalculate_row_amounts(cdt, cdn);
 		recalculate_parent_totals(frm);
+		if (frm.doc.transfer_price_list) {
+			await set_row_transfer_rate_from_price_list(frm, cdt, cdn);
+		}
 	},
-});
-
-frappe.ui.form.on("Inter Company Transfer Item", {
 	form_render(frm) {
 		frm.fields_dict.items.grid.get_field("source_warehouse").get_query = () => ({
 			filters: { company: frm.doc.from_company },
