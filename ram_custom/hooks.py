@@ -26,7 +26,8 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ram_custom/css/ram_custom.css"
-# app_include_js = "/assets/ram_custom/js/ram_custom.js"
+# Cost rate: load on all Desk pages so it always runs (same effect as Client Script wiring).
+app_include_js = ["/assets/ram_custom/js/cost_rate.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/ram_custom/css/ram_custom.css"
@@ -44,8 +45,17 @@ app_license = "mit"
 
 # include js in doctype views
 doctype_js = {
-	"Inter Company Transfer": "ram_custom/ram_custom/doctype/inter_company_transfer/inter_company_transfer.js"
+	"Inter Company Transfer": "ram_custom/ram_custom/doctype/inter_company_transfer/inter_company_transfer.js",
 }
+
+# Fixtures:
+# Create Custom Fields in DB during migrate (no patch scripts).
+fixtures = [
+	{
+		"dt": "Custom Field",
+		"filters": [["module", "=", "Ram Custom"]],
+	},
+]
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
