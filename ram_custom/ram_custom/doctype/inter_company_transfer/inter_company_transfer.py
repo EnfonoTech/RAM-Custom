@@ -69,7 +69,6 @@ class InterCompanyTransfer(Document):
 			total_cost_value += row.cost_value
 			total_transfer_value += row.transfer_value
 
-		self.transfer_id = self.name or self.transfer_id
 		self.cost_value = total_cost_value
 		self.transfer_value = total_transfer_value
 		self.markup_value = flt(self.transfer_value) - flt(self.cost_value)
@@ -120,7 +119,6 @@ class InterCompanyTransfer(Document):
 		self.db_set("issue_stock_entry", result.get("issue_stock_entry"))
 		self.db_set("receipt_stock_entry", result.get("receipt_stock_entry"))
 		self.db_set("receivable_journal_entry", result.get("receivable_journal_entry"))
-		self.db_set("transfer_id", self.name)
 
 	def _apply_account_heads_from_settings(self):
 		if not self.from_company:
