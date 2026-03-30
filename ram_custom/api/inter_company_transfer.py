@@ -339,11 +339,12 @@ def _apply_server_valuation_and_totals(items: list[dict]) -> tuple[float, float]
 			)
 		row["cost_rate"] = cost_rate
 		stock_qty = flt(row["qty"]) * flt(row.get("conversion_factor") or 1)
-		row["cost_value"] = flt(stock_qty * cost_rate)
-		row["transfer_value"] = flt(stock_qty * flt(row["transfer_rate"]))
+		# Round to 2dp to eliminate floating-point artefacts from Bin valuation rate
+		row["cost_value"] = flt(flt(stock_qty * cost_rate, 2))
+		row["transfer_value"] = flt(flt(stock_qty * flt(row["transfer_rate"]), 2))
 		total_cost_value += row["cost_value"]
 		total_transfer_value += row["transfer_value"]
-	return total_cost_value, total_transfer_value
+	return flt(total_cost_value, 2), flt(total_transfer_value, 2)
 
 
 @frappe.whitelist()
@@ -380,13 +381,6 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 	_validate_accounts(from_company, to_company, data, is_remote_transfer=bool(is_remote_transfer))
 	items = _normalize_items(data, is_remote_transfer=bool(is_remote_transfer))
 	total_cost_value, total_transfer_value = _apply_server_valuation_and_totals(items)
-	if flt(total_transfer_value) < flt(total_cost_value):
-		frappe.throw(
-			_(
-				"Total transfer value ({0}) cannot be less than total cost value ({1}). "
-				"Increase transfer rates or reduce cost."
-			).format(total_transfer_value, total_cost_value)
-		)
 	for row in items:
 		if not _warehouse_belongs_to_company(row["source_warehouse"], from_company):
 			frappe.throw(
@@ -466,7 +460,8 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 			receipt.submit()
 			created.append(("Stock Entry", receipt.name))
 
-		markup_value = flt(total_transfer_value - total_cost_value)
+		# Round markup to 2dp to eliminate any floating-point residual
+		markup_value = flt(flt(total_transfer_value - total_cost_value, 2))
 
 		je = frappe.new_doc("Journal Entry")
 		je.voucher_type = "Journal Entry"
@@ -483,21 +478,50 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 				"debit_in_account_currency": total_transfer_value,
 			},
 		)
-		# Cr Branch Sales Clearing (at total cost)
-		je.append(
-			"accounts",
-			{
-				"account": data.get("branch_sales_clearing_account"),
-				"credit_in_account_currency": total_cost_value,
-			},
-		)
-		# Cr markup (validated: transfer >= cost, so markup >= 0)
 		if markup_value > 0:
+			# PROFIT: Dr Receivable = transfer_value
+			#         Cr Branch Sales Clearing = cost_value
+			#         Cr Unrealized Margin = markup_value
+			je.append(
+				"accounts",
+				{
+					"account": data.get("branch_sales_clearing_account"),
+					"credit_in_account_currency": total_cost_value,
+				},
+			)
 			je.append(
 				"accounts",
 				{
 					"account": data.get("unrealized_branch_margin_account"),
 					"credit_in_account_currency": markup_value,
+				},
+			)
+		elif markup_value < 0:
+			# LOSS: Dr Receivable = transfer_value
+			#       Dr Unrealized Margin = |markup_value|  (loss absorbed here)
+			#       Cr Branch Sales Clearing = cost_value
+			# Balanced: transfer_value + |markup| == cost_value
+			je.append(
+				"accounts",
+				{
+					"account": data.get("unrealized_branch_margin_account"),
+					"debit_in_account_currency": abs(markup_value),
+				},
+			)
+			je.append(
+				"accounts",
+				{
+					"account": data.get("branch_sales_clearing_account"),
+					"credit_in_account_currency": total_cost_value,
+				},
+			)
+		else:
+			# AT COST (markup == 0): 2 lines only, no Unrealized Margin
+			je.append(
+				"accounts",
+				{
+					"account": data.get("branch_sales_clearing_account"),
+					"credit_in_account_currency": total_transfer_value,
 				},
 			)
 		je.insert()

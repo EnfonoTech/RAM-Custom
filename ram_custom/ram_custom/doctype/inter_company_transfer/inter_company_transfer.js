@@ -43,9 +43,10 @@ function recalculate_row_amounts(cdt, cdn) {
 	const stock_qty = flt(row.qty) * flt(row.conversion_factor || 1);
 	const cost_rate = flt(row.cost_rate);
 	const transfer_rate = flt(row.transfer_rate);
-	const cost_value = stock_qty * cost_rate;
-	const transfer_value = stock_qty * transfer_rate;
-	const markup_value = transfer_value - cost_value;
+	// Round to 2dp to match server-side precision and avoid floating-point artefacts
+	const cost_value = flt(stock_qty * cost_rate, 2);
+	const transfer_value = flt(stock_qty * transfer_rate, 2);
+	const markup_value = flt(transfer_value - cost_value, 2);
 	frappe.model.set_value(cdt, cdn, "cost_value", cost_value);
 	frappe.model.set_value(cdt, cdn, "transfer_value", transfer_value);
 	frappe.model.set_value(cdt, cdn, "markup_value", markup_value);

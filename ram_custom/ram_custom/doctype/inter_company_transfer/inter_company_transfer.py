@@ -34,6 +34,26 @@ class InterCompanyTransfer(Document):
 		if not self.items:
 			frappe.throw(_("Add at least one item row"))
 
+		# Avoid recomputing valuation-derived totals on Update after submit.
+		# On Update-after-submit, Frappe blocks saving submitted docs when
+		# read-only totals change due to re-fetching/rounding.
+		action = getattr(self, "_action", None)
+		if action == "update_after_submit":
+			should_recompute_values = False
+		elif self.docstatus == 0:
+			should_recompute_values = True
+		else:
+			# Fallback for edge-cases: if linked vouchers exist, skip recompute.
+			linked_exists = any(
+				frappe.db.get_value(self.doctype, self.name, fieldname)
+				for fieldname in (
+					"issue_stock_entry",
+					"receipt_stock_entry",
+					"receivable_journal_entry",
+				)
+			)
+			should_recompute_values = not linked_exists
+
 		total_cost_value = 0.0
 		total_transfer_value = 0.0
 		for row in self.items:
@@ -53,32 +73,29 @@ class InterCompanyTransfer(Document):
 				frappe.throw(_("Target Warehouse is required in each row"))
 			if flt(row.conversion_factor) <= 0:
 				frappe.throw(_("Conversion Factor must be greater than zero in all rows"))
-			row.cost_rate = get_item_valuation_rate(row.item_code, row.source_warehouse)
-			is_stock = frappe.db.get_value("Item", row.item_code, "is_stock_item")
-			if is_stock and flt(row.cost_rate) <= 0:
-				frappe.throw(
-					_(
-						"No valuation rate for item {0} in warehouse {1}. "
-						"Receive stock or revalue before saving."
-					).format(row.item_code, row.source_warehouse)
-				)
-			stock_qty = flt(row.qty) * flt(row.conversion_factor or 1)
-			row.cost_value = flt(stock_qty * row.cost_rate)
-			row.transfer_value = flt(stock_qty * row.transfer_rate)
-			row.markup_value = flt(row.transfer_value) - flt(row.cost_value)
-			total_cost_value += row.cost_value
-			total_transfer_value += row.transfer_value
+			if should_recompute_values:
+				row.cost_rate = get_item_valuation_rate(row.item_code, row.source_warehouse)
+				is_stock = frappe.db.get_value("Item", row.item_code, "is_stock_item")
+				if is_stock and flt(row.cost_rate) <= 0:
+					frappe.throw(
+						_(
+							"No valuation rate for item {0} in warehouse {1}. "
+							"Receive stock or revalue before saving."
+						).format(row.item_code, row.source_warehouse)
+					)
+				stock_qty = flt(row.qty) * flt(row.conversion_factor or 1)
+				# Round to 2dp to eliminate floating-point artefacts from raw Bin valuation rates
+				row.cost_value = flt(flt(stock_qty * row.cost_rate, 2))
+				row.transfer_value = flt(flt(stock_qty * row.transfer_rate, 2))
+				row.markup_value = flt(flt(row.transfer_value - row.cost_value, 2))
+				total_cost_value += row.cost_value
+				total_transfer_value += row.transfer_value
 
-		self.cost_value = total_cost_value
-		self.transfer_value = total_transfer_value
-		self.markup_value = flt(self.transfer_value) - flt(self.cost_value)
-		if flt(self.transfer_value) < flt(self.cost_value):
-			frappe.throw(
-				_(
-					"Total transfer value cannot be less than total cost value. "
-					"Increase transfer rates or check quantities/UOM."
-				)
-			)
+		if should_recompute_values:
+			self.cost_value = flt(total_cost_value, 2)
+			self.transfer_value = flt(total_transfer_value, 2)
+			self.markup_value = flt(flt(self.transfer_value - self.cost_value, 2))
+
 
 	def on_submit(self):
 		if self.issue_stock_entry or self.receipt_stock_entry or self.receivable_journal_entry:
