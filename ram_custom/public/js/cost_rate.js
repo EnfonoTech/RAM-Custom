@@ -1,5 +1,5 @@
 async function computeCostRateForRow(frm, cdt, cdn) {
-	if (cint(frm.doc.docstatus) === 1) return;
+	if (frm.doc.docstatus !== 0) return;
 	const row = locals?.[cdt]?.[cdn];
 	if (!row || !row.item_code) return;
 	const company = frm.doc.company;
@@ -35,7 +35,7 @@ function shouldComputeCostRate(row) {
 }
 
 async function computeCostRatesForParent(frm, force = false) {
-	if (cint(frm.doc.docstatus) === 1) return;
+	if (frm.doc.docstatus !== 0) return;
 	for (const row of frm.doc.items || []) {
 		// row.name is the cdn for child tables.
 		const cdt = row.doctype;
