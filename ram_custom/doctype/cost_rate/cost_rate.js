@@ -1,4 +1,5 @@
 async function computeCostRateForRow(frm, cdt, cdn) {
+	if (cint(frm.doc.docstatus) === 1) return;
 	const row = locals?.[cdt]?.[cdn];
 	if (!row || !row.item_code) return;
 	const company = frm.doc.company;
@@ -33,13 +34,14 @@ function shouldComputeCostRate(row) {
 	return flt(row.cost_rate) <= 0;
 }
 
-async function computeCostRatesForParent(frm) {
+async function computeCostRatesForParent(frm, force = false) {
+	if (cint(frm.doc.docstatus) === 1) return;
 	for (const row of frm.doc.items || []) {
 		// row.name is the cdn for child tables.
 		const cdt = row.doctype;
 		const cdn = row.name;
 		const current = locals?.[cdt]?.[cdn] || row;
-		if (!shouldComputeCostRate(current)) continue;
+		if (!force && !shouldComputeCostRate(current)) continue;
 		await computeCostRateForRow(frm, cdt, cdn);
 	}
 }
@@ -118,7 +120,8 @@ frappe.ui.form.on("Purchase Invoice Item", {
 
 frappe.ui.form.on("Sales Invoice", {
 	refresh(frm) {
-		computeCostRatesForParent(frm);
+		// SI can be created from SO/DN with copied cost_rate; force current valuation fetch.
+		computeCostRatesForParent(frm, true);
 	},
 });
 
