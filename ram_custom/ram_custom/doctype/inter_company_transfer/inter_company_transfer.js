@@ -37,31 +37,69 @@ async function apply_account_heads_from_settings(frm) {
 	frm.set_value("unrealized_branch_margin_account", h.unrealized_branch_margin_account || "");
 }
 
-function recalculate_row_amounts(cdt, cdn) {
+/** Child table updates via frappe.model.set_value always call frm.dirty() in Frappe. */
+function ict_set_child_currency_silent(frm, cdt, cdn, fieldname, value) {
+	const row = locals[cdt]?.[cdn];
+	if (!row) return;
+	const v = flt(value, 2);
+	if (flt(row[fieldname], 2) === v) return;
+	row[fieldname] = v;
+	const pf = row.parentfield || "items";
+	const grid = frm?.fields_dict?.[pf]?.grid;
+	const gr = grid?.grid_rows_by_docname?.[cdn];
+	if (gr) {
+		gr.refresh_field(fieldname);
+	}
+}
+
+function recalculate_row_amounts(frm, cdt, cdn, silent = false) {
 	const row = locals[cdt][cdn];
 	if (!row) return;
 	const stock_qty = flt(row.qty) * flt(row.conversion_factor || 1);
 	const cost_rate = flt(row.cost_rate);
 	const transfer_rate = flt(row.transfer_rate);
-	// Round to 2dp to match server-side precision and avoid floating-point artefacts
 	const cost_value = flt(stock_qty * cost_rate, 2);
 	const transfer_value = flt(stock_qty * transfer_rate, 2);
 	const markup_value = flt(transfer_value - cost_value, 2);
-	frappe.model.set_value(cdt, cdn, "cost_value", cost_value);
-	frappe.model.set_value(cdt, cdn, "transfer_value", transfer_value);
-	frappe.model.set_value(cdt, cdn, "markup_value", markup_value);
+	if (silent && frm) {
+		ict_set_child_currency_silent(frm, cdt, cdn, "cost_value", cost_value);
+		ict_set_child_currency_silent(frm, cdt, cdn, "transfer_value", transfer_value);
+		ict_set_child_currency_silent(frm, cdt, cdn, "markup_value", markup_value);
+	} else {
+		frappe.model.set_value(cdt, cdn, "cost_value", cost_value);
+		frappe.model.set_value(cdt, cdn, "transfer_value", transfer_value);
+		frappe.model.set_value(cdt, cdn, "markup_value", markup_value);
+	}
 }
 
-function recalculate_parent_totals(frm) {
+function recalculate_parent_totals(frm, silent = false) {
 	let total_cost = 0;
 	let total_transfer = 0;
 	(frm.doc.items || []).forEach((d) => {
 		total_cost += flt(d.cost_value);
 		total_transfer += flt(d.transfer_value);
 	});
-	frm.set_value("cost_value", total_cost);
-	frm.set_value("transfer_value", total_transfer);
-	frm.set_value("markup_value", flt(total_transfer - total_cost));
+	total_cost = flt(total_cost, 2);
+	total_transfer = flt(total_transfer, 2);
+	const markup = flt(total_transfer - total_cost, 2);
+	if (silent) {
+		const tasks = [];
+		if (flt(frm.doc.cost_value, 2) !== total_cost) {
+			tasks.push(() => frm.set_value("cost_value", total_cost, false, true));
+		}
+		if (flt(frm.doc.transfer_value, 2) !== total_transfer) {
+			tasks.push(() => frm.set_value("transfer_value", total_transfer, false, true));
+		}
+		if (flt(frm.doc.markup_value, 2) !== markup) {
+			tasks.push(() => frm.set_value("markup_value", markup, false, true));
+		}
+		return tasks.length ? frappe.run_serially(tasks) : Promise.resolve();
+	}
+	return frappe.run_serially([
+		() => frm.set_value("cost_value", total_cost),
+		() => frm.set_value("transfer_value", total_transfer),
+		() => frm.set_value("markup_value", markup),
+	]);
 }
 
 function toggle_remote_mode_fields(frm) {
@@ -98,8 +136,8 @@ function fetch_conversion_factor(frm, cdt, cdn, item_code, uom) {
 					"conversion_factor",
 					flt(r.message.conversion_factor) || 1,
 				);
-				recalculate_row_amounts(cdt, cdn);
-				recalculate_parent_totals(frm);
+				recalculate_row_amounts(frm, cdt, cdn, false);
+				recalculate_parent_totals(frm, false);
 				set_row_transfer_rate_from_price_list(frm, cdt, cdn);
 			}
 		},
@@ -125,8 +163,8 @@ async function on_item_row_item_code(frm, cdt, cdn) {
 async function set_row_cost_rate(frm, cdt, cdn) {
 	const row = locals[cdt][cdn];
 	if (!row.item_code || !row.source_warehouse) {
-		recalculate_row_amounts(cdt, cdn);
-		recalculate_parent_totals(frm);
+		recalculate_row_amounts(frm, cdt, cdn, false);
+		recalculate_parent_totals(frm, false);
 		return;
 	}
 	const r = await frappe.call({
@@ -134,8 +172,8 @@ async function set_row_cost_rate(frm, cdt, cdn) {
 		args: { item_code: row.item_code, warehouse: row.source_warehouse },
 	});
 	frappe.model.set_value(cdt, cdn, "cost_rate", flt(r.message || 0));
-	recalculate_row_amounts(cdt, cdn);
-	recalculate_parent_totals(frm);
+	recalculate_row_amounts(frm, cdt, cdn, false);
+	recalculate_parent_totals(frm, false);
 }
 
 async function set_row_transfer_rate_from_price_list(frm, cdt, cdn) {
@@ -158,8 +196,8 @@ async function set_row_transfer_rate_from_price_list(frm, cdt, cdn) {
 	if (rate > 0) {
 		frappe.model.set_value(cdt, cdn, "transfer_rate", rate);
 	}
-	recalculate_row_amounts(cdt, cdn);
-	recalculate_parent_totals(frm);
+	recalculate_row_amounts(frm, cdt, cdn, false);
+	recalculate_parent_totals(frm, false);
 }
 
 async function refresh_transfer_rates_from_price_list_all_rows(frm) {
@@ -202,10 +240,12 @@ frappe.ui.form.on("Inter Company Transfer", {
 	refresh(frm) {
 		set_account_filters(frm);
 		toggle_remote_mode_fields(frm);
+		// Do not recalculate on every open: child set_value marks form dirty (Frappe limitation).
+		if (cint(frm.doc.docstatus) !== 0) return;
 		(frm.doc.items || []).forEach((d) => {
-			recalculate_row_amounts(d.doctype, d.name);
+			recalculate_row_amounts(frm, d.doctype, d.name, true);
 		});
-		recalculate_parent_totals(frm);
+		recalculate_parent_totals(frm, true);
 	},
 	async from_company(frm) {
 		set_account_filters(frm);
@@ -242,7 +282,7 @@ frappe.ui.form.on("Inter Company Transfer", {
 		});
 	},
 	items_remove(frm) {
-		recalculate_parent_totals(frm);
+		recalculate_parent_totals(frm, false);
 	},
 });
 
@@ -254,12 +294,12 @@ frappe.ui.form.on("Inter Company Transfer Item", {
 		set_row_cost_rate(frm, cdt, cdn);
 	},
 	qty(frm, cdt, cdn) {
-		recalculate_row_amounts(cdt, cdn);
-		recalculate_parent_totals(frm);
+		recalculate_row_amounts(frm, cdt, cdn, false);
+		recalculate_parent_totals(frm, false);
 	},
 	transfer_rate(frm, cdt, cdn) {
-		recalculate_row_amounts(cdt, cdn);
-		recalculate_parent_totals(frm);
+		recalculate_row_amounts(frm, cdt, cdn, false);
+		recalculate_parent_totals(frm, false);
 	},
 	uom(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
@@ -268,8 +308,8 @@ frappe.ui.form.on("Inter Company Transfer Item", {
 		}
 	},
 	async conversion_factor(frm, cdt, cdn) {
-		recalculate_row_amounts(cdt, cdn);
-		recalculate_parent_totals(frm);
+		recalculate_row_amounts(frm, cdt, cdn, false);
+		recalculate_parent_totals(frm, false);
 		await set_row_transfer_rate_from_price_list(frm, cdt, cdn);
 	},
 	async items_add(frm, cdt, cdn) {
@@ -280,8 +320,8 @@ frappe.ui.form.on("Inter Company Transfer Item", {
 		if (frm.doc.default_target_warehouse && !row.target_warehouse) {
 			frappe.model.set_value(cdt, cdn, "target_warehouse", frm.doc.default_target_warehouse);
 		}
-		recalculate_row_amounts(cdt, cdn);
-		recalculate_parent_totals(frm);
+		recalculate_row_amounts(frm, cdt, cdn, false);
+		recalculate_parent_totals(frm, false);
 		if (frm.doc.transfer_price_list) {
 			await set_row_transfer_rate_from_price_list(frm, cdt, cdn);
 		}
