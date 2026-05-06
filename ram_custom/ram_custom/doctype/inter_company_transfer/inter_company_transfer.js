@@ -102,6 +102,11 @@ function recalculate_parent_totals(frm, silent = false) {
 	]);
 }
 
+function toggle_posting_date_editability(frm) {
+	const editable = cint(frm.doc.set_posting_time) === 1;
+	frm.toggle_enable("posting_date", editable);
+}
+
 function toggle_remote_mode_fields(frm) {
 	const is_remote = cint(frm.doc.is_remote_transfer) === 1;
 	frm.toggle_reqd("default_target_warehouse", !is_remote);
@@ -169,11 +174,24 @@ async function set_row_cost_rate(frm, cdt, cdn) {
 	}
 	const r = await frappe.call({
 		method: "ram_custom.api.inter_company_transfer.get_item_valuation_rate",
-		args: { item_code: row.item_code, warehouse: row.source_warehouse },
+		args: {
+			item_code: row.item_code,
+			warehouse: row.source_warehouse,
+			posting_date: frm.doc.posting_date,
+			posting_time: frm.doc.posting_time,
+		},
 	});
 	frappe.model.set_value(cdt, cdn, "cost_rate", flt(r.message || 0));
 	recalculate_row_amounts(frm, cdt, cdn, false);
 	recalculate_parent_totals(frm, false);
+}
+
+async function refresh_cost_rates_all_rows(frm) {
+	for (const d of frm.doc.items || []) {
+		if (d.item_code && d.source_warehouse) {
+			await set_row_cost_rate(frm, d.doctype, d.name);
+		}
+	}
 }
 
 async function set_row_transfer_rate_from_price_list(frm, cdt, cdn) {
@@ -240,6 +258,7 @@ frappe.ui.form.on("Inter Company Transfer", {
 	refresh(frm) {
 		set_account_filters(frm);
 		toggle_remote_mode_fields(frm);
+		toggle_posting_date_editability(frm);
 		// Do not recalculate on every open: child set_value marks form dirty (Frappe limitation).
 		if (cint(frm.doc.docstatus) !== 0) return;
 		(frm.doc.items || []).forEach((d) => {
@@ -270,7 +289,19 @@ frappe.ui.form.on("Inter Company Transfer", {
 		}
 	},
 	async posting_date(frm) {
+		await refresh_cost_rates_all_rows(frm);
 		await refresh_transfer_rates_from_price_list_all_rows(frm);
+	},
+	async posting_time(frm) {
+		await refresh_cost_rates_all_rows(frm);
+	},
+	async set_posting_time(frm) {
+		toggle_posting_date_editability(frm);
+		if (!cint(frm.doc.set_posting_time)) {
+			frm.set_value("posting_date", frappe.datetime.get_today());
+			frm.set_value("posting_time", frappe.datetime.now_time());
+			await refresh_cost_rates_all_rows(frm);
+		}
 	},
 	async transfer_price_list(frm) {
 		await refresh_transfer_rates_from_price_list_all_rows(frm);

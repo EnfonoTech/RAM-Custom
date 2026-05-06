@@ -4,9 +4,19 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, getdate, nowdate
+from frappe.utils import cint, flt, get_time, getdate, now, nowdate, nowtime
 
 TRANSFER_TAG = "ICT"
+
+
+def _normalize_posting_time(posting_time: str | None) -> str:
+	"""Return a posting_time string usable by Stock Entry / Journal Entry validators."""
+	if not posting_time:
+		return nowtime()
+	try:
+		return str(get_time(posting_time))
+	except Exception:
+		return nowtime()
 
 
 def _parse_payload(payload: str | dict) -> dict:
@@ -107,10 +117,54 @@ def get_transfer_account_heads(
 	}
 
 
-def _get_bin_valuation_rate(item_code: str, warehouse: str) -> float:
-	"""Valuation rate per stock UOM; no throw (safe for live form / API preview)."""
+def _get_historical_valuation_rate(
+	item_code: str,
+	warehouse: str,
+	posting_date: str | None = None,
+	posting_time: str | None = None,
+) -> float:
+	"""Valuation rate per stock UOM as of (posting_date, posting_time).
+
+	Looks up the most recent Stock Ledger Entry on or before the given datetime.
+	Falls back to current Bin valuation when no historical SLE exists or when no
+	date/time is supplied (live form preview).
+	"""
 	if not item_code or not warehouse:
 		return 0.0
+
+	if posting_date:
+		try:
+			from erpnext.stock.utils import get_combine_datetime
+		except ImportError:
+			get_combine_datetime = None
+
+		ptime = _normalize_posting_time(posting_time)
+		if get_combine_datetime is not None:
+			posting_datetime = get_combine_datetime(posting_date, ptime)
+		else:
+			posting_datetime = f"{getdate(posting_date)} {ptime}"
+
+		row = frappe.db.sql(
+			"""
+			select valuation_rate
+			from `tabStock Ledger Entry`
+			where item_code = %(item_code)s
+				and warehouse = %(warehouse)s
+				and is_cancelled = 0
+				and posting_datetime <= %(posting_datetime)s
+			order by posting_datetime desc, creation desc
+			limit 1
+			""",
+			{
+				"item_code": item_code,
+				"warehouse": warehouse,
+				"posting_datetime": posting_datetime,
+			},
+			as_dict=True,
+		)
+		if row:
+			return flt(row[0].valuation_rate)
+
 	rate = frappe.db.get_value(
 		"Bin",
 		{"item_code": item_code, "warehouse": warehouse},
@@ -120,9 +174,14 @@ def _get_bin_valuation_rate(item_code: str, warehouse: str) -> float:
 
 
 @frappe.whitelist()
-def get_item_valuation_rate(item_code: str, warehouse: str) -> float:
-	"""Return valuation rate from Bin for item+warehouse (per stock UOM)."""
-	return _get_bin_valuation_rate(item_code, warehouse)
+def get_item_valuation_rate(
+	item_code: str,
+	warehouse: str,
+	posting_date: str | None = None,
+	posting_time: str | None = None,
+) -> float:
+	"""Return valuation rate as of (posting_date, posting_time); falls back to Bin."""
+	return _get_historical_valuation_rate(item_code, warehouse, posting_date, posting_time)
 
 
 def _get_ict_price_list_rate(
@@ -321,21 +380,27 @@ def _normalize_items(data: dict, *, is_remote_transfer: bool = False) -> list[di
 	return normalized
 
 
-def _apply_server_valuation_and_totals(items: list[dict]) -> tuple[float, float]:
-	"""Recalculate cost from Bin (authoritative) and line/totals using stock qty."""
+def _apply_server_valuation_and_totals(
+	items: list[dict],
+	posting_date: str | None = None,
+	posting_time: str | None = None,
+) -> tuple[float, float]:
+	"""Recalculate cost from SLE as of posting datetime and line/totals using stock qty."""
 	total_cost_value = 0.0
 	total_transfer_value = 0.0
 	for row in items:
 		item_code = row["item_code"]
 		source_wh = row["source_warehouse"]
-		cost_rate = _get_bin_valuation_rate(item_code, source_wh)
+		cost_rate = _get_historical_valuation_rate(
+			item_code, source_wh, posting_date, posting_time
+		)
 		is_stock = frappe.db.get_value("Item", item_code, "is_stock_item")
 		if is_stock and flt(cost_rate) <= 0:
 			frappe.throw(
 				_(
-					"No valuation rate for item {0} in warehouse {1}. "
+					"No valuation rate for item {0} in warehouse {1} as of {2} {3}. "
 					"Receive stock or revalue before submitting."
-				).format(item_code, source_wh)
+				).format(item_code, source_wh, posting_date or nowdate(), posting_time or nowtime())
 			)
 		row["cost_rate"] = cost_rate
 		stock_qty = flt(row["qty"]) * flt(row.get("conversion_factor") or 1)
@@ -380,7 +445,11 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 
 	_validate_accounts(from_company, to_company, data, is_remote_transfer=bool(is_remote_transfer))
 	items = _normalize_items(data, is_remote_transfer=bool(is_remote_transfer))
-	total_cost_value, total_transfer_value = _apply_server_valuation_and_totals(items)
+	posting_date = getdate(data.get("posting_date") or nowdate())
+	posting_time = _normalize_posting_time(data.get("posting_time"))
+	total_cost_value, total_transfer_value = _apply_server_valuation_and_totals(
+		items, str(posting_date), posting_time
+	)
 	for row in items:
 		if not _warehouse_belongs_to_company(row["source_warehouse"], from_company):
 			frappe.throw(
@@ -408,8 +477,6 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 	if _is_duplicate("Journal Entry", "user_remark", je_marker):
 		frappe.throw(_("Transfer {0} already has a Receivable JE").format(transfer_id))
 
-	posting_date = getdate(data.get("posting_date") or nowdate())
-
 	created: list[tuple[str, str]] = []
 
 	try:
@@ -417,6 +484,8 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 		issue.stock_entry_type = "Material Issue"
 		issue.company = from_company
 		issue.posting_date = posting_date
+		issue.posting_time = posting_time
+		issue.set_posting_time = 1
 		issue.remarks = f"{issue_marker} Inter-company issue at cost"
 		for row in items:
 			issue.append(
@@ -441,6 +510,8 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 			receipt.stock_entry_type = "Material Receipt"
 			receipt.company = to_company
 			receipt.posting_date = posting_date
+			receipt.posting_time = posting_time
+			receipt.set_posting_time = 1
 			receipt.remarks = f"{receipt_marker} Inter-company receipt at transfer value"
 			for row in items:
 				receipt.append(
@@ -467,6 +538,8 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 		je.voucher_type = "Journal Entry"
 		je.company = from_company
 		je.posting_date = posting_date
+		je.posting_time = posting_time
+		je.set_posting_time = 1
 		je.user_remark = (
 			f"{je_marker} Inter-company receivable creation for transfer {transfer_id}"
 		)

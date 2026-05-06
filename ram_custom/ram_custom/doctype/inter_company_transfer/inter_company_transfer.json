@@ -9,6 +9,8 @@
   "naming_series",
   "column_break_gmkc",
   "posting_date",
+  "posting_time",
+  "set_posting_time",
   "section_break_transfer",
   "from_company",
   "to_company",
@@ -54,6 +56,20 @@
    "fieldtype": "Date",
    "label": "Posting Date",
    "reqd": 1
+  },
+  {
+   "default": "Now",
+   "depends_on": "eval:doc.set_posting_time",
+   "fieldname": "posting_time",
+   "fieldtype": "Time",
+   "label": "Posting Time"
+  },
+  {
+   "default": "0",
+   "fieldname": "set_posting_time",
+   "fieldtype": "Check",
+   "label": "Edit Posting Date and Time",
+   "print_hide": 1
   },
   {
    "fieldname": "section_break_transfer",

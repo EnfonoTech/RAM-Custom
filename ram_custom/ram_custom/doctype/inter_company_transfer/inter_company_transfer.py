@@ -74,7 +74,12 @@ class InterCompanyTransfer(Document):
 			if flt(row.conversion_factor) <= 0:
 				frappe.throw(_("Conversion Factor must be greater than zero in all rows"))
 			if should_recompute_values:
-				row.cost_rate = get_item_valuation_rate(row.item_code, row.source_warehouse)
+				row.cost_rate = get_item_valuation_rate(
+					row.item_code,
+					row.source_warehouse,
+					self.posting_date,
+					self.posting_time,
+				)
 				is_stock = frappe.db.get_value("Item", row.item_code, "is_stock_item")
 				if is_stock and flt(row.cost_rate) <= 0:
 					frappe.throw(
@@ -97,6 +102,41 @@ class InterCompanyTransfer(Document):
 			self.markup_value = flt(flt(self.transfer_value - self.cost_value, 2))
 
 
+	def before_submit(self):
+		self._warn_if_repost_in_progress()
+
+	def _warn_if_repost_in_progress(self):
+		"""Soft warning (no block) when an item+warehouse has an active repost."""
+		pairs = {(r.item_code, r.source_warehouse) for r in (self.items or []) if r.item_code and r.source_warehouse}
+		if not pairs:
+			return
+		blocked = []
+		for item_code, warehouse in pairs:
+			exists = frappe.db.exists(
+				"Repost Item Valuation",
+				{
+					"item_code": item_code,
+					"warehouse": warehouse,
+					"status": ("in", ("Queued", "In Progress")),
+					"docstatus": 1,
+				},
+			)
+			if exists:
+				blocked.append((item_code, warehouse))
+		if blocked:
+			lines = "<br>".join(
+				_("• {0} @ {1}").format(item_code, warehouse) for item_code, warehouse in blocked
+			)
+			frappe.msgprint(
+				_(
+					"Repost Item Valuation is queued or in progress for the following item/warehouse pairs. "
+					"Cost rates may shift after repost completes — use the Inter-Company Cost Variance "
+					"report to reconcile any drift later.<br><br>{0}"
+				).format(lines),
+				title=_("Pending Repost Detected"),
+				indicator="orange",
+			)
+
 	def on_submit(self):
 		if self.issue_stock_entry or self.receipt_stock_entry or self.receivable_journal_entry:
 			frappe.throw(
@@ -106,6 +146,7 @@ class InterCompanyTransfer(Document):
 			{
 				"transfer_id": self.name,
 				"posting_date": self.posting_date,
+				"posting_time": self.posting_time,
 				"from_company": self.from_company,
 				"to_company": self.to_company,
 				"remote_company": self.remote_company,
@@ -136,6 +177,17 @@ class InterCompanyTransfer(Document):
 		self.db_set("issue_stock_entry", result.get("issue_stock_entry"))
 		self.db_set("receipt_stock_entry", result.get("receipt_stock_entry"))
 		self.db_set("receivable_journal_entry", result.get("receivable_journal_entry"))
+		# Seed reconciliation baseline so the variance report shows nothing until SLE drifts.
+		for row in self.items:
+			frappe.db.set_value(
+				row.doctype,
+				row.name,
+				{
+					"reconciled_cost_value": row.cost_value,
+					"previous_reconciled_cost_value": row.cost_value,
+				},
+				update_modified=False,
+			)
 
 	def _apply_account_heads_from_settings(self):
 		if not self.from_company:
