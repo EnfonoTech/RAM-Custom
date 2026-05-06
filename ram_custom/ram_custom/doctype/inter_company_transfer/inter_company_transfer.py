@@ -232,6 +232,7 @@ class InterCompanyTransfer(Document):
 				continue
 			try:
 				doc = frappe.get_doc(doctype, name)
+				doc.flags.ignore_permissions = True
 				if doc.docstatus == 1:
 					doc.cancel()
 			except Exception as e:

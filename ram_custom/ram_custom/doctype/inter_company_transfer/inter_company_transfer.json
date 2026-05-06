@@ -78,6 +78,7 @@
   {
    "fieldname": "from_company",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "From Company",
    "options": "Company",
@@ -86,6 +87,7 @@
   {
    "fieldname": "to_company",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "To Company",
    "options": "Company"
@@ -99,12 +101,14 @@
   {
    "fieldname": "remote_company",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Remote Company",
    "options": "Inter Company Remote Company"
   },
   {
    "fieldname": "default_source_warehouse",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Default Source Warehouse",
    "options": "Warehouse",
    "reqd": 1
@@ -112,6 +116,7 @@
   {
    "fieldname": "default_target_warehouse",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Default Target Warehouse",
    "options": "Warehouse"
   },
@@ -157,6 +162,7 @@
   {
    "fieldname": "cost_of_branch_sales_account",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Cost of Branch Sales Account",
    "options": "Account",
    "read_only": 1,
@@ -165,6 +171,7 @@
   {
    "fieldname": "branch_sales_clearing_account",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Branch Sales Clearing Account",
    "options": "Account",
    "read_only": 1,
@@ -173,6 +180,7 @@
   {
    "fieldname": "from_company_receivable_account",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "From Company Receivable Account",
    "options": "Account",
    "read_only": 1,
@@ -181,6 +189,7 @@
   {
    "fieldname": "to_company_payable_account",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "To Company Payable Account",
    "options": "Account",
    "read_only": 1
@@ -188,6 +197,7 @@
   {
    "fieldname": "unrealized_branch_margin_account",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Unrealized Branch Margin Account",
    "options": "Account",
    "read_only": 1,
@@ -200,6 +210,7 @@
   {
    "fieldname": "issue_stock_entry",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Issue Stock Entry",
    "options": "Stock Entry",
    "read_only": 1
@@ -207,6 +218,7 @@
   {
    "fieldname": "receipt_stock_entry",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Receipt Stock Entry",
    "options": "Stock Entry",
    "read_only": 1
@@ -214,6 +226,7 @@
   {
    "fieldname": "receivable_journal_entry",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Receivable Journal Entry",
    "options": "Journal Entry",
    "read_only": 1
@@ -257,7 +270,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-24 16:01:57.934449",
+ "modified": "2026-05-06 17:14:17.811053",
  "modified_by": "Administrator",
  "module": "Ram Custom",
  "name": "Inter Company Transfer",
@@ -278,6 +291,8 @@
    "write": 1
   },
   {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -287,9 +302,12 @@
    "report": 1,
    "role": "Accounts Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   },
   {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -299,6 +317,7 @@
    "report": 1,
    "role": "Accounts User",
    "share": 1,
+   "submit": 1,
    "write": 1
   }
  ],

@@ -26,6 +26,7 @@
   {
    "fieldname": "inter_company_transfer",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "Inter Company Transfer",
    "options": "Inter Company Transfer",
@@ -93,6 +94,7 @@
   {
    "fieldname": "source_warehouse",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Source Warehouse",
    "options": "Warehouse",
    "read_only": 1

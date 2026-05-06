@@ -50,6 +50,7 @@
   {
    "fieldname": "from_company",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "From Company",
    "options": "Company",
@@ -65,6 +66,7 @@
    "depends_on": "eval:!doc.is_remote_transfer",
    "fieldname": "to_company",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "To Company",
    "mandatory_depends_on": "eval:!doc.is_remote_transfer",
@@ -74,6 +76,7 @@
    "depends_on": "eval:doc.is_remote_transfer",
    "fieldname": "remote_company",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "Remote Company",
    "mandatory_depends_on": "eval:doc.is_remote_transfer",
@@ -104,6 +107,7 @@
   {
    "fieldname": "branch_sales_clearing_account",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Branch Sales Clearing Account",
    "options": "Account",
    "read_only": 1,
@@ -112,6 +116,7 @@
   {
    "fieldname": "unrealized_branch_margin_account",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Unrealized Branch Margin Account",
    "options": "Account",
    "read_only": 1,
@@ -146,6 +151,7 @@
   {
    "fieldname": "journal_entry",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Journal Entry",
    "options": "Journal Entry",
    "read_only": 1

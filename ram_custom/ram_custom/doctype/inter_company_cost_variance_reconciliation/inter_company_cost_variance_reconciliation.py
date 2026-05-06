@@ -61,6 +61,7 @@ class InterCompanyCostVarianceReconciliation(Document):
 		if self.journal_entry:
 			try:
 				je = frappe.get_doc("Journal Entry", self.journal_entry)
+				je.flags.ignore_permissions = True
 				if je.docstatus == 1:
 					je.cancel()
 			except Exception:
@@ -207,7 +208,11 @@ class InterCompanyCostVarianceReconciliation(Document):
 					"credit_in_account_currency": amt,
 				},
 			)
-		je.insert()
+		# Reconciliation is the trust boundary; the JE only touches accounts that the
+		# config (ICT Settings) authorises for this company-pair. Bypass permissions
+		# so users without direct Journal Entry roles can post the adjustment.
+		je.flags.ignore_permissions = True
+		je.insert(ignore_permissions=True)
 		je.submit()
 		return je.name
 
@@ -287,6 +292,7 @@ def fetch_variance_rows(
 		"Inter Company Transfer",
 		filters=filters,
 		fields=["name", "posting_date", "posting_time"],
+		ignore_permissions=True,
 	)
 	if not icts:
 		return []
@@ -306,6 +312,7 @@ def fetch_variance_rows(
 				"conversion_factor",
 				"reconciled_cost_value",
 			],
+			ignore_permissions=True,
 		)
 		for child in children:
 			rate = _get_historical_valuation_rate(

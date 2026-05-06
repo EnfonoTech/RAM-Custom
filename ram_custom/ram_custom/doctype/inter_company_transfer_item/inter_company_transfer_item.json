@@ -123,12 +123,14 @@
   {
    "fieldname": "source_warehouse",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Source Warehouse",
    "options": "Warehouse"
   },
   {
    "fieldname": "target_warehouse",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Target Warehouse",
    "options": "Warehouse"
   },

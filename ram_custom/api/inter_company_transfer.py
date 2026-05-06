@@ -302,10 +302,11 @@ def _rollback_created_vouchers(created: list[tuple[str, str]]) -> None:
 			continue
 		try:
 			doc = frappe.get_doc(doctype, name)
+			doc.flags.ignore_permissions = True
 			if doc.docstatus == 1:
 				doc.cancel()
 			elif doc.docstatus == 0:
-				frappe.delete_doc(doctype, name, force=1)
+				frappe.delete_doc(doctype, name, force=1, ignore_permissions=True)
 		except Exception:
 			frappe.log_error(
 				title=_("Rollback failed for {0} {1}").format(doctype, name),
@@ -507,7 +508,11 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 					"expense_account": data.get("cost_of_branch_sales_account"),
 				},
 			)
-		issue.insert()
+		# ICT is the trust boundary: account/warehouse ownership is validated above,
+		# so SE/JE creation runs with elevated permissions to allow ICT users who
+		# don't have direct Stock Entry / Journal Entry roles to trigger the flow.
+		issue.flags.ignore_permissions = True
+		issue.insert(ignore_permissions=True)
 		issue.submit()
 		created.append(("Stock Entry", issue.name))
 
@@ -535,7 +540,8 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 						"expense_account": data.get("to_company_payable_account"),
 					},
 				)
-			receipt.insert()
+			receipt.flags.ignore_permissions = True
+			receipt.insert(ignore_permissions=True)
 			receipt.submit()
 			created.append(("Stock Entry", receipt.name))
 
@@ -605,7 +611,8 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 					"credit_in_account_currency": total_transfer_value,
 				},
 			)
-		je.insert()
+		je.flags.ignore_permissions = True
+		je.insert(ignore_permissions=True)
 		je.submit()
 		created.append(("Journal Entry", je.name))
 
