@@ -9,13 +9,18 @@
   "inter_company_transfer",
   "ict_item_row",
   "item_code",
-  "source_warehouse",
+  "uom",
   "qty",
-  "stock_qty",
-  "column_break_main",
   "previous_baseline",
   "current_sle_cost",
-  "variance"
+  "variance",
+  "column_break_main",
+  "source_warehouse",
+  "stock_uom",
+  "conversion_factor",
+  "stock_qty",
+  "previous_baseline_rate",
+  "current_sle_rate"
  ],
  "fields": [
   {
@@ -46,27 +51,19 @@
    "read_only": 1
   },
   {
-   "fieldname": "source_warehouse",
+   "fieldname": "uom",
    "fieldtype": "Link",
-   "label": "Source Warehouse",
-   "options": "Warehouse",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM",
    "read_only": 1
   },
   {
    "fieldname": "qty",
    "fieldtype": "Float",
+   "in_list_view": 1,
    "label": "Qty",
    "read_only": 1
-  },
-  {
-   "fieldname": "stock_qty",
-   "fieldtype": "Float",
-   "label": "Stock Qty",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_main",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "previous_baseline",
@@ -88,13 +85,55 @@
    "in_list_view": 1,
    "label": "Variance",
    "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "label": "Conversion Factor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_qty",
+   "fieldtype": "Float",
+   "label": "Stock Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "previous_baseline_rate",
+   "fieldtype": "Currency",
+   "label": "Previous Baseline Rate (Stock UOM)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "current_sle_rate",
+   "fieldtype": "Currency",
+   "label": "Current SLE Rate (Stock UOM)",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-05-06 10:00:00",
+ "modified": "2026-05-06 12:00:00",
  "modified_by": "Administrator",
  "module": "Ram Custom",
  "name": "Inter Company Cost Variance Reconciliation Item",

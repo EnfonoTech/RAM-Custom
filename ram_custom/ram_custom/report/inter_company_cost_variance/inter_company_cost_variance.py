@@ -47,11 +47,37 @@ def _columns() -> list[dict]:
 			"width": 140,
 		},
 		{
+			"fieldname": "remote_company",
+			"label": _("Remote Company"),
+			"fieldtype": "Link",
+			"options": "Inter Company Remote Company",
+			"width": 140,
+		},
+		{
 			"fieldname": "item_code",
 			"label": _("Item"),
 			"fieldtype": "Link",
 			"options": "Item",
 			"width": 160,
+		},
+		{
+			"fieldname": "uom",
+			"label": _("UOM"),
+			"fieldtype": "Link",
+			"options": "UOM",
+			"width": 80,
+		},
+		{
+			"fieldname": "qty",
+			"label": _("Qty"),
+			"fieldtype": "Float",
+			"width": 90,
+		},
+		{
+			"fieldname": "stock_qty",
+			"label": _("Stock Qty"),
+			"fieldtype": "Float",
+			"width": 100,
 		},
 		{
 			"fieldname": "source_warehouse",
@@ -61,10 +87,16 @@ def _columns() -> list[dict]:
 			"width": 160,
 		},
 		{
-			"fieldname": "stock_qty",
-			"label": _("Stock Qty"),
-			"fieldtype": "Float",
-			"width": 100,
+			"fieldname": "previous_baseline_rate",
+			"label": _("Baseline Rate"),
+			"fieldtype": "Currency",
+			"width": 120,
+		},
+		{
+			"fieldname": "current_sle_rate",
+			"label": _("Current Rate"),
+			"fieldtype": "Currency",
+			"width": 120,
 		},
 		{
 			"fieldname": "previous_baseline",
@@ -88,6 +120,8 @@ def _columns() -> list[dict]:
 
 
 def _rows(filters: frappe._dict) -> list[dict]:
+	from frappe.utils import cint
+
 	conditions = ["ict.docstatus = 1"]
 	params: dict = {}
 
@@ -97,6 +131,13 @@ def _rows(filters: frappe._dict) -> list[dict]:
 	if filters.get("to_company"):
 		conditions.append("ict.to_company = %(to_company)s")
 		params["to_company"] = filters.to_company
+	if filters.get("remote_company"):
+		conditions.append("ict.remote_company = %(remote_company)s")
+		params["remote_company"] = filters.remote_company
+	if filters.get("transfer_mode") == "Local":
+		conditions.append("ict.is_remote_transfer = 0")
+	elif filters.get("transfer_mode") == "Remote":
+		conditions.append("ict.is_remote_transfer = 1")
 	if filters.get("from_date"):
 		conditions.append("ict.posting_date >= %(from_date)s")
 		params["from_date"] = getdate(filters.from_date)
@@ -116,8 +157,11 @@ def _rows(filters: frappe._dict) -> list[dict]:
 			ict.posting_time,
 			ict.from_company,
 			ict.to_company,
+			ict.remote_company,
+			ict.is_remote_transfer,
 			child.name as ict_item_row,
 			child.item_code,
+			child.uom,
 			child.source_warehouse,
 			child.qty,
 			child.conversion_factor,
@@ -143,7 +187,8 @@ def _rows(filters: frappe._dict) -> list[dict]:
 			str(r.posting_date) if r.posting_date else None,
 			r.posting_time,
 		)
-		stock_qty = flt(r.qty) * flt(r.conversion_factor or 1)
+		cf = flt(r.conversion_factor or 1)
+		stock_qty = flt(r.qty) * cf
 		current_cost = flt(stock_qty * flt(rate), 2)
 		previous = flt(r.reconciled_cost_value, 2)
 		variance = flt(current_cost - previous, 2)
@@ -154,10 +199,15 @@ def _rows(filters: frappe._dict) -> list[dict]:
 				"inter_company_transfer": r.inter_company_transfer,
 				"posting_date": r.posting_date,
 				"from_company": r.from_company,
-				"to_company": r.to_company,
+				"to_company": r.to_company if not cint(r.is_remote_transfer) else "",
+				"remote_company": r.remote_company if cint(r.is_remote_transfer) else "",
 				"item_code": r.item_code,
-				"source_warehouse": r.source_warehouse,
+				"uom": r.uom,
+				"qty": flt(r.qty),
 				"stock_qty": stock_qty,
+				"source_warehouse": r.source_warehouse,
+				"previous_baseline_rate": flt(previous / stock_qty, 6) if stock_qty else 0,
+				"current_sle_rate": flt(rate, 6),
 				"previous_baseline": previous,
 				"current_sle_cost": current_cost,
 				"variance": variance,

@@ -11,6 +11,7 @@ from frappe.utils import flt, getdate
 from ram_custom.api.inter_company_transfer import (
 	_get_company_pair_account_row,
 	_get_historical_valuation_rate,
+	_get_remote_company_account_row,
 )
 
 RECON_TAG = "ICT_VARIANCE_RECON"
@@ -22,8 +23,16 @@ def _marker(recon_id: str) -> str:
 
 class InterCompanyCostVarianceReconciliation(Document):
 	def validate(self):
-		if self.from_company == self.to_company:
-			frappe.throw(_("From Company and To Company cannot be the same"))
+		if self.is_remote_transfer:
+			if not self.remote_company:
+				frappe.throw(_("Remote Company is required for remote reconciliation"))
+			self.to_company = None
+		else:
+			if not self.to_company:
+				frappe.throw(_("To Company is required"))
+			if self.from_company == self.to_company:
+				frappe.throw(_("From Company and To Company cannot be the same"))
+			self.remote_company = None
 		if getdate(self.period_from) > getdate(self.period_to):
 			frappe.throw(_("Period From cannot be after Period To"))
 		self._fetch_accounts_from_settings()
@@ -67,7 +76,10 @@ class InterCompanyCostVarianceReconciliation(Document):
 	def _fetch_accounts_from_settings(self):
 		if self.branch_sales_clearing_account and self.unrealized_branch_margin_account:
 			return
-		row = _get_company_pair_account_row(self.from_company, self.to_company)
+		if self.is_remote_transfer:
+			row = _get_remote_company_account_row(self.from_company, self.remote_company)
+		else:
+			row = _get_company_pair_account_row(self.from_company, self.to_company)
 		if not row:
 			return
 		if not self.branch_sales_clearing_account:
@@ -105,6 +117,8 @@ class InterCompanyCostVarianceReconciliation(Document):
 				row.ict_item_row,
 				[
 					"item_code",
+					"uom",
+					"stock_uom",
 					"source_warehouse",
 					"qty",
 					"conversion_factor",
@@ -122,14 +136,22 @@ class InterCompanyCostVarianceReconciliation(Document):
 				str(ict.posting_date) if ict.posting_date else None,
 				ict.posting_time,
 			)
-			stock_qty = flt(child.qty) * flt(child.conversion_factor or 1)
+			cf = flt(child.conversion_factor or 1)
+			stock_qty = flt(child.qty) * cf
+			previous = flt(child.reconciled_cost_value, 2)
+			current_cost = flt(stock_qty * flt(rate), 2)
 			row.item_code = child.item_code
+			row.uom = child.uom
+			row.stock_uom = child.stock_uom
+			row.conversion_factor = cf
 			row.source_warehouse = child.source_warehouse
 			row.qty = child.qty
 			row.stock_qty = stock_qty
-			row.previous_baseline = flt(child.reconciled_cost_value, 2)
-			row.current_sle_cost = flt(stock_qty * flt(rate), 2)
-			row.variance = flt(row.current_sle_cost - row.previous_baseline, 2)
+			row.previous_baseline = previous
+			row.current_sle_cost = current_cost
+			row.variance = flt(current_cost - previous, 2)
+			row.previous_baseline_rate = flt(previous / stock_qty, 6) if stock_qty else 0
+			row.current_sle_rate = flt(rate, 6)
 
 	def _compute_totals(self):
 		total = 0.0
@@ -229,24 +251,41 @@ class InterCompanyCostVarianceReconciliation(Document):
 @frappe.whitelist()
 def fetch_variance_rows(
 	from_company: str,
-	to_company: str,
 	period_from: str,
 	period_to: str,
+	to_company: str | None = None,
+	remote_company: str | None = None,
+	is_remote_transfer: int | str | None = 0,
 ) -> list[dict]:
 	"""Return ICT child rows whose current SLE cost differs from their baseline."""
-	if not (from_company and to_company and period_from and period_to):
-		frappe.throw(_("All filters are required"))
-	if from_company == to_company:
-		frappe.throw(_("From Company and To Company cannot be the same"))
+	from frappe.utils import cint
+
+	is_remote = bool(cint(is_remote_transfer))
+	if not (from_company and period_from and period_to):
+		frappe.throw(_("From Company and period are required"))
+	if is_remote:
+		if not remote_company:
+			frappe.throw(_("Remote Company is required for remote reconciliation"))
+	else:
+		if not to_company:
+			frappe.throw(_("To Company is required"))
+		if from_company == to_company:
+			frappe.throw(_("From Company and To Company cannot be the same"))
+
+	filters = {
+		"docstatus": 1,
+		"from_company": from_company,
+		"posting_date": ["between", [getdate(period_from), getdate(period_to)]],
+		"is_remote_transfer": 1 if is_remote else 0,
+	}
+	if is_remote:
+		filters["remote_company"] = remote_company
+	else:
+		filters["to_company"] = to_company
 
 	icts = frappe.get_all(
 		"Inter Company Transfer",
-		filters={
-			"docstatus": 1,
-			"from_company": from_company,
-			"to_company": to_company,
-			"posting_date": ["between", [getdate(period_from), getdate(period_to)]],
-		},
+		filters=filters,
 		fields=["name", "posting_date", "posting_time"],
 	)
 	if not icts:
@@ -260,6 +299,8 @@ def fetch_variance_rows(
 			fields=[
 				"name",
 				"item_code",
+				"uom",
+				"stock_uom",
 				"source_warehouse",
 				"qty",
 				"conversion_factor",
@@ -273,7 +314,8 @@ def fetch_variance_rows(
 				str(ict.posting_date) if ict.posting_date else None,
 				ict.posting_time,
 			)
-			stock_qty = flt(child.qty) * flt(child.conversion_factor or 1)
+			cf = flt(child.conversion_factor or 1)
+			stock_qty = flt(child.qty) * cf
 			current_cost = flt(stock_qty * flt(rate), 2)
 			previous = flt(child.reconciled_cost_value, 2)
 			variance = flt(current_cost - previous, 2)
@@ -284,12 +326,17 @@ def fetch_variance_rows(
 					"inter_company_transfer": ict.name,
 					"ict_item_row": child.name,
 					"item_code": child.item_code,
+					"uom": child.uom,
+					"stock_uom": child.stock_uom,
+					"conversion_factor": cf,
 					"source_warehouse": child.source_warehouse,
 					"qty": child.qty,
 					"stock_qty": stock_qty,
 					"previous_baseline": previous,
 					"current_sle_cost": current_cost,
 					"variance": variance,
+					"previous_baseline_rate": flt(previous / stock_qty, 6) if stock_qty else 0,
+					"current_sle_rate": flt(rate, 6),
 				}
 			)
 	return out

@@ -7,10 +7,25 @@ frappe.query_reports["Inter-Company Cost Variance"] = {
 			options: "Company",
 		},
 		{
+			fieldname: "transfer_mode",
+			label: __("Transfer Mode"),
+			fieldtype: "Select",
+			options: "\nLocal\nRemote",
+			default: "",
+		},
+		{
 			fieldname: "to_company",
 			label: __("To Company"),
 			fieldtype: "Link",
 			options: "Company",
+			depends_on: "eval:doc.transfer_mode !== 'Remote'",
+		},
+		{
+			fieldname: "remote_company",
+			label: __("Remote Company"),
+			fieldtype: "Link",
+			options: "Inter Company Remote Company",
+			depends_on: "eval:doc.transfer_mode !== 'Local'",
 		},
 		{
 			fieldname: "from_date",
@@ -54,9 +69,12 @@ frappe.query_reports["Inter-Company Cost Variance"] = {
 	onload(report) {
 		report.page.add_inner_button(__("Reconcile Variance"), () => {
 			const filters = report.get_values() || {};
+			const is_remote = filters.transfer_mode === "Remote";
 			frappe.new_doc("Inter Company Cost Variance Reconciliation", {
 				from_company: filters.from_company || "",
-				to_company: filters.to_company || "",
+				to_company: is_remote ? "" : filters.to_company || "",
+				remote_company: is_remote ? filters.remote_company || "" : "",
+				is_remote_transfer: is_remote ? 1 : 0,
 				period_from: filters.from_date || "",
 				period_to: filters.to_date || "",
 			});

@@ -10,7 +10,9 @@
   "posting_date",
   "column_break_header",
   "from_company",
+  "is_remote_transfer",
   "to_company",
+  "remote_company",
   "section_break_period",
   "period_from",
   "period_to",
@@ -54,12 +56,28 @@
    "reqd": 1
   },
   {
+   "default": "0",
+   "fieldname": "is_remote_transfer",
+   "fieldtype": "Check",
+   "label": "Remote Transfer"
+  },
+  {
+   "depends_on": "eval:!doc.is_remote_transfer",
    "fieldname": "to_company",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "To Company",
-   "options": "Company",
-   "reqd": 1
+   "mandatory_depends_on": "eval:!doc.is_remote_transfer",
+   "options": "Company"
+  },
+  {
+   "depends_on": "eval:doc.is_remote_transfer",
+   "fieldname": "remote_company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Remote Company",
+   "mandatory_depends_on": "eval:doc.is_remote_transfer",
+   "options": "Inter Company Remote Company"
   },
   {
    "fieldname": "section_break_period",
@@ -147,7 +165,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-06 10:00:00",
+ "modified": "2026-05-06 12:00:00",
  "modified_by": "Administrator",
  "module": "Ram Custom",
  "name": "Inter Company Cost Variance Reconciliation",
@@ -155,6 +173,8 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -165,11 +185,11 @@
    "role": "System Manager",
    "share": 1,
    "submit": 1,
-   "write": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   },
   {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -180,9 +200,7 @@
    "role": "Accounts Manager",
    "share": 1,
    "submit": 1,
-   "write": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   },
   {
    "email": 1,
