@@ -38,11 +38,11 @@ async function apply_account_heads_from_settings(frm) {
 }
 
 /** Child table updates via frappe.model.set_value always call frm.dirty() in Frappe. */
-function ict_set_child_currency_silent(frm, cdt, cdn, fieldname, value) {
+function ict_set_child_value_silent(frm, cdt, cdn, fieldname, value, precision = 2) {
 	const row = locals[cdt]?.[cdn];
 	if (!row) return;
-	const v = flt(value, 2);
-	if (flt(row[fieldname], 2) === v) return;
+	const v = flt(value, precision);
+	if (flt(row[fieldname], precision) === v) return;
 	row[fieldname] = v;
 	const pf = row.parentfield || "items";
 	const grid = frm?.fields_dict?.[pf]?.grid;
@@ -55,21 +55,25 @@ function ict_set_child_currency_silent(frm, cdt, cdn, fieldname, value) {
 function recalculate_row_amounts(frm, cdt, cdn, silent = false) {
 	const row = locals[cdt][cdn];
 	if (!row) return;
-	const stock_qty = flt(row.qty) * flt(row.conversion_factor || 1);
-	const cost_rate = flt(row.cost_rate);
-	const transfer_rate = flt(row.transfer_rate);
-	const cost_value = flt(stock_qty * cost_rate, 2);
-	const transfer_value = flt(stock_qty * transfer_rate, 2);
+	const cf = flt(row.conversion_factor || 1);
+	const qty = flt(row.qty);
+	const stock_qty = qty * cf;
+	const cost_rate_stock_uom = flt(row.cost_rate_stock_uom);
+	const cost_rate = cost_rate_stock_uom * cf; // per selected UOM
+	const transfer_rate = flt(row.transfer_rate); // per selected UOM (user input)
+	const transfer_rate_stock_uom = cf ? transfer_rate / cf : 0;
+	const cost_value = flt(stock_qty * cost_rate_stock_uom, 2);
+	const transfer_value = flt(qty * transfer_rate, 2);
 	const markup_value = flt(transfer_value - cost_value, 2);
-	if (silent && frm) {
-		ict_set_child_currency_silent(frm, cdt, cdn, "cost_value", cost_value);
-		ict_set_child_currency_silent(frm, cdt, cdn, "transfer_value", transfer_value);
-		ict_set_child_currency_silent(frm, cdt, cdn, "markup_value", markup_value);
-	} else {
-		frappe.model.set_value(cdt, cdn, "cost_value", cost_value);
-		frappe.model.set_value(cdt, cdn, "transfer_value", transfer_value);
-		frappe.model.set_value(cdt, cdn, "markup_value", markup_value);
-	}
+	const setter = silent
+		? (field, value, precision = 2) => ict_set_child_value_silent(frm, cdt, cdn, field, value, precision)
+		: (field, value) => frappe.model.set_value(cdt, cdn, field, value);
+	setter("stock_qty", stock_qty, 4);
+	setter("cost_rate", cost_rate);
+	setter("transfer_rate_stock_uom", transfer_rate_stock_uom);
+	setter("cost_value", cost_value);
+	setter("transfer_value", transfer_value);
+	setter("markup_value", markup_value);
 }
 
 function recalculate_parent_totals(frm, silent = false) {
@@ -181,7 +185,8 @@ async function set_row_cost_rate(frm, cdt, cdn) {
 			posting_time: frm.doc.posting_time,
 		},
 	});
-	frappe.model.set_value(cdt, cdn, "cost_rate", flt(r.message || 0));
+	// SLE valuation rate is per stock UOM; selected-UOM cost_rate is derived in recalculate.
+	frappe.model.set_value(cdt, cdn, "cost_rate_stock_uom", flt(r.message || 0));
 	recalculate_row_amounts(frm, cdt, cdn, false);
 	recalculate_parent_totals(frm, false);
 }

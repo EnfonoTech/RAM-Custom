@@ -8,17 +8,20 @@
  "field_order": [
   "item_code",
   "uom",
-  "stock_uom",
   "conversion_factor",
   "qty",
-  "source_warehouse",
-  "column_break_ijaq",
-  "target_warehouse",
   "cost_rate",
   "transfer_rate",
-  "cost_value",
   "transfer_value",
   "markup_value",
+  "column_break_ijaq",
+  "stock_uom",
+  "stock_qty",
+  "cost_rate_stock_uom",
+  "transfer_rate_stock_uom",
+  "cost_value",
+  "source_warehouse",
+  "target_warehouse",
   "reconciled_cost_value",
   "previous_reconciled_cost_value"
  ],
@@ -40,13 +43,6 @@
    "options": "UOM"
   },
   {
-   "fieldname": "stock_uom",
-   "fieldtype": "Link",
-   "label": "Stock UOM",
-   "options": "UOM",
-   "read_only": 1
-  },
-  {
    "default": "1",
    "fieldname": "conversion_factor",
    "fieldtype": "Float",
@@ -62,37 +58,18 @@
    "reqd": 1
   },
   {
-   "fieldname": "source_warehouse",
-   "fieldtype": "Link",
-   "label": "Source Warehouse",
-   "options": "Warehouse"
-  },
-  {
-   "fieldname": "target_warehouse",
-   "fieldtype": "Link",
-   "label": "Target Warehouse",
-   "options": "Warehouse"
-  },
-  {
    "fieldname": "cost_rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Cost Rate",
-   "read_only": 1,
-   "reqd": 1
+   "label": "Cost Rate (UOM)",
+   "read_only": 1
   },
   {
    "fieldname": "transfer_rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Transfer Rate",
+   "label": "Transfer Rate (UOM)",
    "reqd": 1
-  },
-  {
-   "fieldname": "cost_value",
-   "fieldtype": "Currency",
-   "label": "Cost Value",
-   "read_only": 1
   },
   {
    "fieldname": "transfer_value",
@@ -111,6 +88,49 @@
   {
    "fieldname": "column_break_ijaq",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_qty",
+   "fieldtype": "Float",
+   "label": "Qty in Stock UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cost_rate_stock_uom",
+   "fieldtype": "Currency",
+   "label": "Cost Rate (Stock UOM)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transfer_rate_stock_uom",
+   "fieldtype": "Currency",
+   "label": "Transfer Rate (Stock UOM)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cost_value",
+   "fieldtype": "Currency",
+   "label": "Cost Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "label": "Target Warehouse",
+   "options": "Warehouse"
   },
   {
    "fieldname": "reconciled_cost_value",
@@ -134,7 +154,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-24 16:03:35.590051",
+ "modified": "2026-05-06 11:00:00",
  "modified_by": "Administrator",
  "module": "Ram Custom",
  "name": "Inter Company Transfer Item",

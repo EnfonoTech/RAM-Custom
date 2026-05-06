@@ -5,3 +5,4 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 ram_custom.patches.v0_0_2.seed_ict_reconciled_cost_value
+ram_custom.patches.v0_0_2.seed_ict_uom_split_rates

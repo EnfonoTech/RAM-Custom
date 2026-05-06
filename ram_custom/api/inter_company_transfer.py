@@ -385,28 +385,35 @@ def _apply_server_valuation_and_totals(
 	posting_date: str | None = None,
 	posting_time: str | None = None,
 ) -> tuple[float, float]:
-	"""Recalculate cost from SLE as of posting datetime and line/totals using stock qty."""
+	"""Recompute cost from SLE (per stock UOM) and totals using selected-UOM rates.
+
+	`transfer_rate` is treated as per row UOM. `cost_rate_stock_uom` is per stock UOM
+	(SLE-authoritative). Both are reconciled on each row so callers can use either."""
 	total_cost_value = 0.0
 	total_transfer_value = 0.0
 	for row in items:
 		item_code = row["item_code"]
 		source_wh = row["source_warehouse"]
-		cost_rate = _get_historical_valuation_rate(
+		cost_rate_stock_uom = _get_historical_valuation_rate(
 			item_code, source_wh, posting_date, posting_time
 		)
 		is_stock = frappe.db.get_value("Item", item_code, "is_stock_item")
-		if is_stock and flt(cost_rate) <= 0:
+		if is_stock and flt(cost_rate_stock_uom) <= 0:
 			frappe.throw(
 				_(
 					"No valuation rate for item {0} in warehouse {1} as of {2} {3}. "
 					"Receive stock or revalue before submitting."
 				).format(item_code, source_wh, posting_date or nowdate(), posting_time or nowtime())
 			)
-		row["cost_rate"] = cost_rate
-		stock_qty = flt(row["qty"]) * flt(row.get("conversion_factor") or 1)
-		# Round to 2dp to eliminate floating-point artefacts from Bin valuation rate
-		row["cost_value"] = flt(flt(stock_qty * cost_rate, 2))
-		row["transfer_value"] = flt(flt(stock_qty * flt(row["transfer_rate"]), 2))
+		cf = flt(row.get("conversion_factor") or 1)
+		stock_qty = flt(row["qty"]) * cf
+		transfer_rate = flt(row["transfer_rate"])
+		row["cost_rate_stock_uom"] = cost_rate_stock_uom
+		row["cost_rate"] = cost_rate_stock_uom * cf
+		row["stock_qty"] = stock_qty
+		row["transfer_rate_stock_uom"] = transfer_rate / cf if cf else 0
+		row["cost_value"] = flt(flt(stock_qty * cost_rate_stock_uom, 2))
+		row["transfer_value"] = flt(flt(flt(row["qty"]) * transfer_rate, 2))
 		total_cost_value += row["cost_value"]
 		total_transfer_value += row["transfer_value"]
 	return flt(total_cost_value, 2), flt(total_transfer_value, 2)
@@ -523,7 +530,8 @@ def create_inter_company_transfer(payload: str | dict) -> dict:
 						"stock_uom": row.get("stock_uom"),
 						"conversion_factor": row.get("conversion_factor") or 1,
 						"t_warehouse": row["target_warehouse"],
-						"basic_rate": row["transfer_rate"],
+						# Stock Entry expects basic_rate per stock UOM.
+						"basic_rate": flt(row.get("transfer_rate_stock_uom") or 0),
 						"expense_account": data.get("to_company_payable_account"),
 					},
 				)

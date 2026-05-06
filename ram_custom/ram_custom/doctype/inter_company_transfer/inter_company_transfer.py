@@ -74,24 +74,29 @@ class InterCompanyTransfer(Document):
 			if flt(row.conversion_factor) <= 0:
 				frappe.throw(_("Conversion Factor must be greater than zero in all rows"))
 			if should_recompute_values:
-				row.cost_rate = get_item_valuation_rate(
+				# SLE valuation rate is always per stock UOM. Selected-UOM rates
+				# are derived; users see/enter them, the math runs in stock UOM.
+				row.cost_rate_stock_uom = get_item_valuation_rate(
 					row.item_code,
 					row.source_warehouse,
 					self.posting_date,
 					self.posting_time,
 				)
 				is_stock = frappe.db.get_value("Item", row.item_code, "is_stock_item")
-				if is_stock and flt(row.cost_rate) <= 0:
+				if is_stock and flt(row.cost_rate_stock_uom) <= 0:
 					frappe.throw(
 						_(
 							"No valuation rate for item {0} in warehouse {1}. "
 							"Receive stock or revalue before saving."
 						).format(row.item_code, row.source_warehouse)
 					)
-				stock_qty = flt(row.qty) * flt(row.conversion_factor or 1)
-				# Round to 2dp to eliminate floating-point artefacts from raw Bin valuation rates
-				row.cost_value = flt(flt(stock_qty * row.cost_rate, 2))
-				row.transfer_value = flt(flt(stock_qty * row.transfer_rate, 2))
+				cf = flt(row.conversion_factor or 1)
+				stock_qty = flt(row.qty) * cf
+				row.stock_qty = stock_qty
+				row.cost_rate = flt(row.cost_rate_stock_uom) * cf
+				row.transfer_rate_stock_uom = flt(row.transfer_rate) / cf if cf else 0
+				row.cost_value = flt(flt(stock_qty * row.cost_rate_stock_uom, 2))
+				row.transfer_value = flt(flt(flt(row.qty) * flt(row.transfer_rate), 2))
 				row.markup_value = flt(flt(row.transfer_value - row.cost_value, 2))
 				total_cost_value += row.cost_value
 				total_transfer_value += row.transfer_value
