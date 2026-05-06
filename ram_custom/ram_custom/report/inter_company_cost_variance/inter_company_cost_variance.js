@@ -11,7 +11,7 @@ frappe.query_reports["Inter-Company Cost Variance"] = {
 			label: __("Transfer Mode"),
 			fieldtype: "Select",
 			options: "\nLocal\nRemote",
-			default: "",
+			default: "Local",
 		},
 		{
 			fieldname: "to_company",
