@@ -1,3 +1,5 @@
+import os
+
 app_name = "ram_custom"
 app_title = "Ram Custom"
 app_publisher = "ramees"
@@ -26,8 +28,36 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ram_custom/css/ram_custom.css"
+
+
+def _asset_version():
+	"""Cache-busting token for the plain /assets paths below.
+
+	Frappe only version-stamps `.bundle.` assets, and nginx serves /assets with
+	`Cache-Control: max-age=31536000`, so a browser that loaded these files once keeps
+	them for a year and a shipped JS fix never arrives. Key the url on the newest mtime
+	under public/js so it moves on every deploy.
+	"""
+	js_dir = os.path.join(os.path.dirname(__file__), "public", "js")
+	try:
+		return str(
+			int(
+				max(
+					os.path.getmtime(os.path.join(js_dir, name))
+					for name in os.listdir(js_dir)
+					if name.endswith(".js")
+				)
+			)
+		)
+	except (OSError, ValueError):
+		return "0"
+
+
 # Cost rate: load on all Desk pages so it always runs (same effect as Client Script wiring).
-app_include_js = ["/assets/ram_custom/js/cost_rate.js", "/assets/ram_custom/js/customer_quick_entry.js"]
+app_include_js = [
+	f"/assets/ram_custom/js/cost_rate.js?v={_asset_version()}",
+	f"/assets/ram_custom/js/customer_quick_entry.js?v={_asset_version()}",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/ram_custom/css/ram_custom.css"
@@ -168,7 +198,10 @@ doc_events = {
 		"validate": "ram_custom.api.inter_company_transfer.block_inter_company_invoices",
 	},
 	"Customer": {
-		"after_insert": "ram_custom.api.customer_quick_entry.set_extra_address_fields",
+		# on_update, NOT after_insert: the primary Address is created inside
+		# Customer.on_update, which runs after after_insert. See the docstring in
+		# ram_custom/api/customer_quick_entry.py.
+		"on_update": "ram_custom.api.customer_quick_entry.set_extra_address_fields",
 	},
 }
 
