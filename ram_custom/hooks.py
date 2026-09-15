@@ -27,7 +27,7 @@ app_license = "mit"
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ram_custom/css/ram_custom.css"
 # Cost rate: load on all Desk pages so it always runs (same effect as Client Script wiring).
-app_include_js = ["/assets/ram_custom/js/cost_rate.js"]
+app_include_js = ["/assets/ram_custom/js/cost_rate.js", "/assets/ram_custom/js/customer_quick_entry.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/ram_custom/css/ram_custom.css"
@@ -53,6 +53,10 @@ doctype_js = {
 fixtures = [
 	{
 		"dt": "Custom Field",
+		"filters": [["module", "=", "Ram Custom"]],
+	},
+	{
+		"dt": "Property Setter",
 		"filters": [["module", "=", "Ram Custom"]],
 	},
 ]
@@ -162,6 +166,9 @@ doc_events = {
 	},
 	"Purchase Invoice": {
 		"validate": "ram_custom.api.inter_company_transfer.block_inter_company_invoices",
+	},
+	"Customer": {
+		"after_insert": "ram_custom.api.customer_quick_entry.set_extra_address_fields",
 	},
 }
 
