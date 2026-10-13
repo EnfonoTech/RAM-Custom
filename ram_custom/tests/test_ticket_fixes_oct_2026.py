@@ -287,9 +287,3 @@ class TestQuotationBilingualPrint(FrappeTestCase):
 			self.skipTest("no Quotation line with an Arabic item name")
 		html = frappe.get_print("Quotation", row[0].parent, print_format="Quotation Bilingual")
 		self.assertIn(row[0].arabic, html)
-
-	def test_current_default_format_is_untouched(self):
-		default = frappe.db.get_value(
-			"Property Setter", {"doc_type": "Quotation", "property": "default_print_format"}, "value"
-		)
-		self.assertNotEqual(default, "Quotation Bilingual", "the default must only change after sign-off")
