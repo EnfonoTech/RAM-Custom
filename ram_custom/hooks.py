@@ -89,6 +89,10 @@ fixtures = [
 		"dt": "Property Setter",
 		"filters": [["module", "=", "Ram Custom"]],
 	},
+	{
+		"dt": "Print Format",
+		"filters": [["name", "in", ["Quotation Bilingual"]]],
+	},
 ]
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -196,6 +200,11 @@ doc_events = {
 	},
 	"Purchase Invoice": {
 		"validate": "ram_custom.api.inter_company_transfer.block_inter_company_invoices",
+	},
+	"Address": {
+		# Mirrors the visible Arabic address fields into the older duplicates that
+		# print formats still read. Runs after arabic_translation's own before_save.
+		"before_save": "ram_custom.api.address_arabic.sync_arabic_fields",
 	},
 	"Customer": {
 		# on_update, NOT after_insert: the primary Address is created inside
