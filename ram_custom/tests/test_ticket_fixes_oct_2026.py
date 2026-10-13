@@ -268,6 +268,26 @@ class TestQuotationBilingualPrint(FrappeTestCase):
 		if arabic:
 			self.assertIn(arabic, html)
 
+	def test_item_arabic_name_is_printed_under_description(self):
+		if not frappe.get_meta("Item").has_field("custom_item_name_arabic"):
+			self.skipTest("Item has no custom_item_name_arabic field")
+		row = frappe.db.sql(
+			"""
+			select qi.parent, qi.item_code, i.custom_item_name_arabic as arabic
+			from `tabQuotation Item` qi
+			join `tabQuotation` q on q.name = qi.parent
+			join `tabItem` i on i.name = qi.item_code
+			where q.docstatus < 2 and q.quotation_to = 'Customer'
+			  and ifnull(i.custom_item_name_arabic, '') != ''
+			limit 1
+			""",
+			as_dict=True,
+		)
+		if not row:
+			self.skipTest("no Quotation line with an Arabic item name")
+		html = frappe.get_print("Quotation", row[0].parent, print_format="Quotation Bilingual")
+		self.assertIn(row[0].arabic, html)
+
 	def test_current_default_format_is_untouched(self):
 		default = frappe.db.get_value(
 			"Property Setter", {"doc_type": "Quotation", "property": "default_print_format"}, "value"
