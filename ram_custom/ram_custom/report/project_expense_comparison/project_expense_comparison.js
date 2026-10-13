@@ -49,6 +49,13 @@ frappe.query_reports["Project Expense Comparison"] = {
 			default: frappe.datetime.get_today(),
 		},
 		{
+			fieldname: "account_type",
+			label: __("Account Type"),
+			fieldtype: "Select",
+			options: ["All", "Income", "Expense"],
+			default: "All",
+		},
+		{
 			fieldname: "cost_center",
 			label: __("Cost Center"),
 			fieldtype: "Link",
