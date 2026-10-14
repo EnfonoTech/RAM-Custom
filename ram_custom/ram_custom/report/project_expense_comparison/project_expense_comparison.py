@@ -16,16 +16,24 @@ def execute(filters=None):
 	gl_rows = get_gl_data(filters)
 	projects = get_projects(gl_rows, filters)
 	columns = get_columns(projects)
-	data = get_data(gl_rows, projects, filters.company)
+	data = get_data(gl_rows, projects, filters.company, get_root_types(filters))
 	chart = get_chart_data(data, projects)
 	report_summary = get_report_summary(data)
 
 	return columns, data, None, chart, report_summary
 
 
+def get_root_types(filters):
+	if filters.get("account_type") in ("Income", "Expense"):
+		return [filters.account_type]
+	return ["Income", "Expense"]
+
+
 def get_gl_data(filters):
 	gle = qb.DocType("GL Entry")
 	acc = qb.DocType("Account")
+
+	root_types = get_root_types(filters)
 
 	query = (
 		qb.from_(gle)
@@ -34,17 +42,18 @@ def get_gl_data(filters):
 		.select(
 			gle.account,
 			acc.account_name,
+			acc.root_type,
 			gle.project,
 			(Sum(gle.debit) - Sum(gle.credit)).as_("amount"),
 		)
-		.where(acc.root_type == "Expense")
+		.where(acc.root_type.isin(root_types))
 		.where(acc.is_group == 0)
 		.where(gle.is_cancelled == 0)
 		.where(gle.is_opening == "No")
 		.where(gle.company == filters.company)
 		.where(gle.project.isnotnull())
 		.where(gle.project != "")
-		.groupby(gle.account, gle.project)
+		.groupby(gle.account, gle.project, acc.root_type)
 		.orderby(acc.name, Order.asc)
 	)
 
@@ -97,11 +106,17 @@ def get_columns(projects):
 	columns = [
 		{
 			"fieldname": "account",
-			"label": _("Expense Account"),
+			"label": _("Account"),
 			"fieldtype": "Link",
 			"options": "Account",
 			"width": 220,
-		}
+		},
+		{
+			"fieldname": "root_type",
+			"label": _("Account Type"),
+			"fieldtype": "Data",
+			"width": 110,
+		},
 	]
 
 	for project in projects:
@@ -139,7 +154,7 @@ def get_columns(projects):
 	return columns
 
 
-def get_data(gl_rows, projects, company):
+def get_data(gl_rows, projects, company, root_types):
 	if not projects:
 		return []
 
@@ -148,22 +163,44 @@ def get_data(gl_rows, projects, company):
 	accounts = {}
 	for row in gl_rows:
 		accounts.setdefault(
-			row.account, {"account": row.account, "account_name": row.account_name, "amounts": {}}
+			row.account,
+			{"account": row.account, "root_type": row.root_type, "amounts": {}},
 		)
-		accounts[row.account]["amounts"][row.project] = flt(row.amount)
+		# income is stored as credit; show it as a positive figure
+		sign = -1 if row.root_type == "Income" else 1
+		accounts[row.account]["amounts"][row.project] = sign * flt(row.amount)
 
 	data = []
-	for account in accounts.values():
-		row = {"account": account["account"], "currency": currency}
-		total = 0
-		for project in projects:
-			amount = flt(account["amounts"].get(project["name"]))
-			row[project["fieldname"]] = amount
-			total += amount
-		row["total"] = total
-		data.append(row)
+	totals = {}
+	for root_type in root_types:
+		section_total = {p["fieldname"]: 0 for p in projects}
+		section_accounts = sorted(
+			(a for a in accounts.values() if a["root_type"] == root_type), key=lambda a: a["account"]
+		)
+		for account in section_accounts:
+			row = {"account": account["account"], "root_type": root_type, "currency": currency}
+			for project in projects:
+				amount = flt(account["amounts"].get(project["name"]))
+				row[project["fieldname"]] = amount
+				section_total[project["fieldname"]] += amount
+			row["total"] = sum(row[p["fieldname"]] for p in projects)
+			data.append(row)
 
-	data.sort(key=lambda r: r["account"])
+		total_row = {"account": _("Total {0}").format(_(root_type)), "currency": currency, "bold": 1}
+		total_row.update(section_total)
+		total_row["total"] = sum(section_total.values())
+		data.append(total_row)
+		totals[root_type] = total_row
+
+	if len(root_types) < 2:
+		return data
+
+	net = {"account": _("Net Profit / (Loss)"), "currency": currency, "bold": 1}
+	for project in projects:
+		fn = project["fieldname"]
+		net[fn] = totals["Income"][fn] - totals["Expense"][fn]
+	net["total"] = totals["Income"]["total"] - totals["Expense"]["total"]
+	data.append(net)
 	return data
 
 
@@ -171,18 +208,25 @@ def get_chart_data(data, projects):
 	if not data or not projects:
 		return None
 
-	labels = [p["label"] for p in projects]
-	totals = []
-	for project in projects:
-		totals.append(sum(flt(row.get(project["fieldname"])) for row in data))
+	by_account = {row["account"]: row for row in data if row.get("bold")}
+	income = by_account.get(_("Total Income"), {})
+	expense = by_account.get(_("Total Expense"), {})
+
+	datasets, colors = [], []
+	if income:
+		datasets.append({"name": _("Income"), "values": [flt(income.get(p["fieldname"])) for p in projects]})
+		colors.append("#29cd42")
+	if expense:
+		datasets.append({"name": _("Expense"), "values": [flt(expense.get(p["fieldname"])) for p in projects]})
+		colors.append("#fc4f51")
 
 	return {
 		"data": {
-			"labels": labels,
-			"datasets": [{"name": _("Total Expense"), "values": totals}],
+			"labels": [p["label"] for p in projects],
+			"datasets": datasets,
 		},
 		"type": "bar",
-		"colors": ["#fc4f51"],
+		"colors": colors,
 	}
 
 
@@ -190,13 +234,26 @@ def get_report_summary(data):
 	if not data:
 		return None
 
-	grand_total = sum(flt(row.get("total")) for row in data)
+	by_account = {row["account"]: row for row in data if row.get("bold")}
+	income = flt(by_account.get(_("Total Income"), {}).get("total"))
+	expense = flt(by_account.get(_("Total Expense"), {}).get("total"))
 
-	return [
-		{
-			"value": grand_total,
-			"indicator": "Blue",
-			"label": _("Total Expense"),
-			"datatype": "Currency",
-		},
-	]
+	summary = []
+	if _("Total Income") in by_account:
+		summary.append(
+			{"value": income, "indicator": "Green", "label": _("Total Income"), "datatype": "Currency"}
+		)
+	if _("Total Expense") in by_account:
+		summary.append(
+			{"value": expense, "indicator": "Red", "label": _("Total Expense"), "datatype": "Currency"}
+		)
+	if _("Net Profit / (Loss)") in by_account:
+		summary.append(
+			{
+				"value": income - expense,
+				"indicator": "Green" if income >= expense else "Red",
+				"label": _("Net Profit / (Loss)"),
+				"datatype": "Currency",
+			}
+		)
+	return summary
