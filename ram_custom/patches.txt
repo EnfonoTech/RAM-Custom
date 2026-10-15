@@ -8,3 +8,4 @@ ram_custom.patches.v0_0_2.seed_ict_reconciled_cost_value
 ram_custom.patches.v0_0_2.seed_ict_uom_split_rates
 ram_custom.patches.v0_0_3.fix_delivery_note_return_status
 ram_custom.patches.v0_0_3.merge_duplicate_address_arabic_fields
+ram_custom.patches.v0_0_4.fix_po_print_vat_rate
