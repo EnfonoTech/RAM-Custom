@@ -41,6 +41,8 @@ REASON_SAME_LINES = "Same supplier, invoice date, items, quantities and rates"
 # Staff have bypassed the unique supplier invoice number check by appending a
 # word such as "-DUPLICTE"; strip those so the original number still collides.
 DUPLICATE_SUFFIX = re.compile(r"(DUPLICATE|DUPLICTE|DUPLCATE|DUP|COPY)\d*$")
+# "INV-000689" on the receipt and "000689" on the invoice are the same bill
+INVOICE_PREFIX = re.compile(r"^(INVOICE|INV)(?=\d)")
 
 DEFAULT_TOLERANCE = 1.0
 
@@ -79,8 +81,9 @@ def validate_filters(filters):
 
 
 def normalise(value):
-	"""Upper-case alphanumerics only, so 'in-01 533379' == 'IN01533379'."""
-	return re.sub(r"[^A-Z0-9]", "", cstr(value).upper())
+	"""Upper-case alphanumerics only, without a leading INV/INVOICE before a digit,
+	so 'in-01 533379' == 'IN01533379' and 'INV-000689' == '000689'."""
+	return INVOICE_PREFIX.sub("", re.sub(r"[^A-Z0-9]", "", cstr(value).upper()))
 
 
 def invoice_root(value):
@@ -181,7 +184,7 @@ def get_invoices(filters):
 			pi.supplier,
 			pi.bill_no,
 			pi.posting_date,
-			pi.base_grand_total,
+			pi.base_net_total,
 			pii.purchase_receipt,
 		)
 		.where(
@@ -204,7 +207,7 @@ def get_invoices(filters):
 				"supplier": row.supplier,
 				"bill_no": row.bill_no,
 				"posting_date": row.posting_date,
-				"amount": flt(row.base_grand_total),
+				"amount": flt(row.base_net_total),
 				"linked_receipts": set(),
 			},
 		)
@@ -221,7 +224,7 @@ def get_receipts(filters):
 			pr.name,
 			pr.supplier,
 			pr.posting_date,
-			pr.base_grand_total,
+			pr.base_net_total,
 			pr.custom_supplier_invoice_number.as_("inv"),
 			pr.custom_supplier_invoice_date.as_("inv_date"),
 		)
@@ -235,7 +238,7 @@ def get_receipts(filters):
 			"name": r.name,
 			"supplier": r.supplier,
 			"posting_date": r.posting_date,
-			"amount": flt(r.base_grand_total),
+			"amount": flt(r.base_net_total),
 			"inv": r.inv,
 			"inv_date": r.inv_date,
 		}
@@ -293,8 +296,8 @@ def get_awaiting_columns(currency):
 		{"label": _("Posting Date"), "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
 		{"label": _("Supplier"), "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 220},
 		{"label": _("Supplier Invoice No"), "fieldname": "bill_no", "fieldtype": "Data", "width": 150},
-		{"label": _("Invoice Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
-		{"label": _("Days Waiting"), "fieldname": "age", "fieldtype": "Int", "width": 100},
+		{"label": _("Invoice Amount (excl. VAT)"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
+		{"label": _("Days Waiting"), "fieldname": "age", "fieldtype": "Int", "width": 100, "disable_total": 1},
 		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data", "width": 220},
 		{"label": _("Possible Receipt (same amount)"), "fieldname": "candidates", "fieldtype": "Data", "width": 220},
 	]
@@ -334,8 +337,8 @@ def get_no_invoice_columns(currency):
 		{"label": _("Posting Date"), "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
 		{"label": _("Supplier"), "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 220},
 		{"label": _("Supplier Invoice No"), "fieldname": "inv", "fieldtype": "Data", "width": 150},
-		{"label": _("Receipt Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
-		{"label": _("Days Waiting"), "fieldname": "age", "fieldtype": "Int", "width": 100},
+		{"label": _("Receipt Amount (excl. VAT)"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
+		{"label": _("Days Waiting"), "fieldname": "age", "fieldtype": "Int", "width": 100, "disable_total": 1},
 		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data", "width": 220},
 		{"label": _("Possible Invoice (same amount)"), "fieldname": "candidates", "fieldtype": "Data", "width": 220},
 	]
@@ -375,9 +378,9 @@ def get_mismatch_columns(currency):
 		{"label": _("Posting Date"), "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
 		{"label": _("Supplier"), "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 220},
 		{"label": _("Supplier Invoice No"), "fieldname": "bill_no", "fieldtype": "Data", "width": 150},
-		{"label": _("Invoice Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
+		{"label": _("Invoice Amount (excl. VAT)"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
 		{"label": _("Purchase Receipt"), "fieldname": "receipts", "fieldtype": "Data", "width": 170},
-		{"label": _("Receipt Amount"), "fieldname": "receipt_amount", "fieldtype": "Currency", "options": currency, "width": 120},
+		{"label": _("Receipt Amount (excl. VAT)"), "fieldname": "receipt_amount", "fieldtype": "Currency", "options": currency, "width": 120},
 		{"label": _("Difference (Invoice - Receipt)"), "fieldname": "difference", "fieldtype": "Currency", "options": currency, "width": 150},
 	]
 
@@ -419,7 +422,7 @@ def get_duplicate_columns(currency):
 		{"label": _("Supplier"), "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 220},
 		{"label": _("Supplier Invoice No"), "fieldname": "inv", "fieldtype": "Data", "width": 170},
 		{"label": _("Supplier Invoice Date"), "fieldname": "inv_date", "fieldtype": "Date", "width": 120},
-		{"label": _("Receipt Amount"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
+		{"label": _("Receipt Amount (excl. VAT)"), "fieldname": "amount", "fieldtype": "Currency", "options": currency, "width": 120},
 		{"label": _("Why Flagged"), "fieldname": "reason", "fieldtype": "Data", "width": 330},
 		{"label": _("Related Receipts"), "fieldname": "related", "fieldtype": "Data", "width": 220},
 	]

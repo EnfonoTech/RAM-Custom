@@ -31,6 +31,12 @@ class TestMatching(FrappeTestCase):
 		self.assertEqual(normalise(" in-01 533379 "), "IN01533379")
 		self.assertEqual(normalise(None), "")
 
+	def test_normalise_drops_leading_inv_before_a_digit(self):
+		self.assertEqual(normalise("INV-000689"), normalise("000689"))
+		self.assertEqual(normalise("Invoice 123"), "123")
+		# not a prefix when no digit follows: a real word stays
+		self.assertEqual(normalise("INVENT-5"), "INVENT5")
+
 	def test_invoice_root_strips_duplicate_markers(self):
 		self.assertEqual(invoice_root("IN01-533379-DUPLICTE"), "IN01533379")
 		self.assertEqual(invoice_root("IN01-533379 copy2"), "IN01533379")
